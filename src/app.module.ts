@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
-import { OpenAIModule } from './modules/openai.module';
-import { OpenAIController } from './controllers/openai.controllers';
+import { OpenAIModule } from './modules/openai/openai.module';
+import { OpenAIController } from './modules/openai/openai.controllers';
 import { ConfigModule } from '@nestjs/config';
 import { envSchema } from './config/env.validation';
+import { AlchemyModule } from './modules/alchemy/alchemy.module';
+import { Network } from 'alchemy-sdk';
 
 @Module({
   imports: [
@@ -12,6 +14,10 @@ import { envSchema } from './config/env.validation';
     }),
     OpenAIModule.forRoot({
       openai: process.env.OPENAI_API_KEY,
+    }),
+    AlchemyModule.forRoot({
+      apiKey: process.env.ALCHEMY_API_KEY,
+      network: Network.BASE_SEPOLIA,
     }),
   ],
 
