@@ -11,6 +11,7 @@ import { SupabaseModule } from './modules/supabase/supabase.module';
 import { AnalysisModule } from './modules/analysis/analysis.module';
 import { BlockExplorerModule } from './modules/block-explorer/block-explorer.module';
 import { ContractModule } from './modules/contract/contract.module';
+import { BraveModule } from './modules/brave/brave.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ContractModule } from './modules/contract/contract.module';
     }),
     TokensModule.forRoot(),
     GraphModule.forRoot({ graphApiKey: process.env.GRAPH_API_KEY }),
+    BraveModule.forRoot({apiKey: process.env.BRAVE_API_KEY}),
     AnalysisModule.forRoot(),
     BlockExplorerModule.forRoot({ apiKey: process.env.BASESCAN_API_KEY }),
     ContractModule.forRoot({

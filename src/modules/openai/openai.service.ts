@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AlchemyService } from '../alchemy/alchemy.service';
 import { TokensService } from '../tokens/tokens.services';
+import { BraveService } from '../brave/brave.service';
 
 @Injectable()
 export class OpenAIService {
@@ -45,12 +46,28 @@ export class OpenAIService {
           this.tokensService.getTokenMarketDataById(tokenName.tokenName),
       },
     },
+    {
+      type: 'function',
+      function: {
+        name: "search",
+        description : 'internet search',
+        parse: JSON.parse,
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' },
+          },
+        },
+        function: (query: any) => this.braveService.search(query.query)
+      }
+    }
   ];
 
   constructor(
     @Inject('OPENAI_CONFIG') private readonly config: { openAiApiKey: string },
     private alchemyService: AlchemyService,
     private tokensService: TokensService,
+    private braveService: BraveService
   ) {
     this.openai = new OpenAI({
       apiKey: config.openAiApiKey,
@@ -83,8 +100,10 @@ export class OpenAIService {
 
     if (!isUsingTool) return;
 
+
     message.tool_calls.forEach((tool: any) => {
       let info = '';
+      console.log(tool)
 
       switch (tool.function.name) {
         case 'getTokenBalances':
