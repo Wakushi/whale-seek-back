@@ -8,6 +8,7 @@ import { GraphModule } from './modules/graph/graph.module';
 import { ConfigModule } from '@nestjs/config';
 import { envSchema } from 'config/env.validation';
 import { SupabaseModule } from './modules/supabase/supabase.module';
+import { AnalysisModule } from './modules/analysis/analysis.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { SupabaseModule } from './modules/supabase/supabase.module';
     }),
     TokensModule.forRoot(),
     GraphModule.forRoot({ graphApiKey: process.env.GRAPH_API_KEY }),
+    AnalysisModule,
   ],
 })
 export class AppModule {}

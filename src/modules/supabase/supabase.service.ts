@@ -91,6 +91,7 @@ export class SupabaseService {
     collection,
     items,
     options = {},
+    conflictTarget,
   }: {
     collection: Collection;
     items: Omit<T, 'id'>[];
@@ -98,6 +99,7 @@ export class SupabaseService {
       batchSize?: number;
       progressLabel?: string;
     };
+    conflictTarget?: string;
   }): Promise<T[]> {
     const { batchSize = this.BATCH_SIZE, progressLabel = 'items' } = options;
     const allInsertedData: T[] = [];
@@ -114,12 +116,15 @@ export class SupabaseService {
 
         const { data, error } = await this.client
           .from(collection)
-          .insert(batch)
+          .upsert(batch, {
+            onConflict: conflictTarget,
+            ignoreDuplicates: false,
+          })
           .select();
 
         if (error) {
           throw new SupabaseError(
-            `Failed to insert batch in ${collection}: ${error.message}`,
+            `Failed to upsert batch in ${collection}: ${error.message}`,
             error,
           );
         }
@@ -129,7 +134,7 @@ export class SupabaseService {
 
       return allInsertedData;
     } catch (error) {
-      console.error(`Error in batch insert for ${collection}:`, error);
+      console.error(`Error in batch upsert for ${collection}:`, error);
       throw error;
     }
   }

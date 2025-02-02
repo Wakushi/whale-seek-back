@@ -38,6 +38,7 @@ export class DiscoveryService {
     this.supabaseService.batchInsert({
       collection: Collection.WHALE_INFO,
       items: whalesInfo,
+      conflictTarget: 'whale_address',
     });
   }
 
