@@ -7,6 +7,7 @@ export const envSchema = z.object({
   ALCHEMY_API_KEY: z.string(),
   SUPABASE_URL: z.string(),
   SUPABASE_API_KEY: z.string(),
+  BRAVE_API_KEY: z.string(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

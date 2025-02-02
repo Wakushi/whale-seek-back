@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AlchemyService } from '../alchemy/alchemy.service';
 import { TokensService } from '../tokens/tokens.services';
+import { BraveService } from '../brave/brave.service';
 
 @Injectable()
 export class OpenAIService {
@@ -13,7 +14,6 @@ export class OpenAIService {
     {
       type: 'function',
       function: {
-        name: 'getTokenBalances',
         description:
           'Retrieves the ERC-20 token balances for a given wallet address.',
         parse: JSON.parse,
@@ -32,7 +32,6 @@ export class OpenAIService {
     {
       type: 'function',
       function: {
-        name: 'getTokenMarketDataById',
         description: 'Retrieves the market data of a token based on its ID.',
         parse: JSON.parse,
         parameters: {
@@ -45,12 +44,27 @@ export class OpenAIService {
           this.tokensService.getTokenMarketDataById(tokenName.tokenName),
       },
     },
+    {
+      type: 'function',
+      function: {
+        description : 'internet search',
+        parse: JSON.parse,
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' },
+          },
+        },
+        function: (query: any) => this.braveService.search(query.query)
+      }
+    }
   ];
 
   constructor(
     @Inject('OPENAI_CONFIG') private readonly config: { openAiApiKey: string },
     private alchemyService: AlchemyService,
     private tokensService: TokensService,
+    private braveService: BraveService
   ) {
     this.openai = new OpenAI({
       apiKey: config.openAiApiKey,

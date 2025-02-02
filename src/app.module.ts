@@ -9,6 +9,7 @@ import { ConfigModule } from '@nestjs/config';
 import { envSchema } from 'config/env.validation';
 import { SupabaseModule } from './modules/supabase/supabase.module';
 import { AnalysisModule } from './modules/analysis/analysis.module';
+import { BraveModule } from './modules/brave/brave.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AnalysisModule } from './modules/analysis/analysis.module';
     }),
     TokensModule.forRoot(),
     GraphModule.forRoot({ graphApiKey: process.env.GRAPH_API_KEY }),
+    BraveModule.forRoot({apiKey: process.env.BRAVE_API_KEY}),
     AnalysisModule,
   ],
 })
