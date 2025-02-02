@@ -9,6 +9,8 @@ import { ConfigModule } from '@nestjs/config';
 import { envSchema } from 'config/env.validation';
 import { SupabaseModule } from './modules/supabase/supabase.module';
 import { AnalysisModule } from './modules/analysis/analysis.module';
+import { BlockExplorerModule } from './modules/block-explorer/block-explorer.module';
+import { ContractModule } from './modules/contract/contract.module';
 
 @Module({
   imports: [
@@ -22,7 +24,7 @@ import { AnalysisModule } from './modules/analysis/analysis.module';
     }),
     AlchemyModule.forRoot({
       apiKey: process.env.ALCHEMY_API_KEY,
-      network: Network.BASE_SEPOLIA,
+      network: Network.BASE_MAINNET,
     }),
     SupabaseModule.forRoot({
       privateKey: process.env.SUPABASE_API_KEY,
@@ -30,7 +32,11 @@ import { AnalysisModule } from './modules/analysis/analysis.module';
     }),
     TokensModule.forRoot(),
     GraphModule.forRoot({ graphApiKey: process.env.GRAPH_API_KEY }),
-    AnalysisModule,
+    AnalysisModule.forRoot(),
+    BlockExplorerModule.forRoot({ apiKey: process.env.BASESCAN_API_KEY }),
+    ContractModule.forRoot({
+      rpcUrl: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+    }),
   ],
 })
 export class AppModule {}

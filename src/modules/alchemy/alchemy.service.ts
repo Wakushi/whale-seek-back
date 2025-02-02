@@ -1,6 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Alchemy, Network, TokenBalanceType } from 'alchemy-sdk';
 import { hexToDecimal } from 'src/utils/math.helper';
+import { Address } from 'viem';
+import {
+  NULL_BALANCE,
+  Wallet,
+  WalletTokenBalance,
+} from '../tokens/entities/token.type';
 
 @Injectable()
 export class AlchemyService {
@@ -25,15 +31,19 @@ export class AlchemyService {
    * @param walletAddress - The wallet address.
    * @returns The formatted token balances.
    */
-  public async getTokenBalances(walletAddress: string): Promise<any> {
+  public async getTokenBalances(walletAddress: Address): Promise<Wallet> {
     try {
-      const balances = await this.client.core.getTokenBalances(walletAddress, {
-        type: TokenBalanceType.ERC20,
+      const balances = await this.client.core.getTokenBalances(walletAddress);
+
+      const nonZeroBalances = balances.tokenBalances.filter((token) => {
+        return token.tokenBalance !== NULL_BALANCE;
       });
 
-      const formattedBalances = await Promise.all(
-        balances.tokenBalances.map(async (balance) => {
-          const metadata = await this.getTokenMetadata(balance.contractAddress);
+      const formattedBalances: WalletTokenBalance[] = await Promise.all(
+        nonZeroBalances.map(async (balance) => {
+          const metadata = await this.getTokenMetadata(
+            balance.contractAddress as Address,
+          );
 
           const tokenAmount = hexToDecimal(
             balance.tokenBalance,
@@ -71,7 +81,7 @@ export class AlchemyService {
    * @param contractAddress - The token's contract address.
    * @returns The token's metadata.
    */
-  public async getTokenMetadata(contractAddress: string): Promise<{
+  public async getTokenMetadata(contractAddress: Address): Promise<{
     name: string;
     symbol: string;
     decimals: number;
