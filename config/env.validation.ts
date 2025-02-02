@@ -5,6 +5,8 @@ export const envSchema = z.object({
   GRAPH_API_KEY: z.string(),
   OPENAI_API_KEY: z.string(),
   ALCHEMY_API_KEY: z.string(),
+  SUPABASE_URL: z.string(),
+  SUPABASE_API_KEY: z.string(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

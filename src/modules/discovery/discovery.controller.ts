@@ -9,6 +9,9 @@ export class DiscoveryController {
   @HttpCode(200)
   async testEndpoint() {
     const whales = await this.discoveryService.findWhales();
+
+    await this.discoveryService.saveWhales(whales);
+
     return whales;
   }
 }
