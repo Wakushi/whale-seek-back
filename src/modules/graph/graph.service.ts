@@ -36,7 +36,7 @@ export class GraphService {
           orderBy: wad
           orderDirection: desc
         ) {
-          id
+          transactionHash
           initiator
           src
           dst

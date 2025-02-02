@@ -1,6 +1,7 @@
 -- Table to store basic whale information
 create table whale_info (
     whale_address text primary key,        -- Unique wallet address of the whale
+    detected_transaction_id text not null  -- Transaction that led to the detection of the whale
     first_seen timestamptz not null,       -- Timestamp when the whale was first discovered
     last_seen timestamptz not null,        -- Timestamp of the whale's most recent activity
     created_at timestamptz not null default now(),  -- Timestamp when the record was created

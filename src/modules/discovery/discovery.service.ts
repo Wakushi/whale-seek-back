@@ -4,33 +4,49 @@ import { WethTransferQuery } from '../graph/entities/graph.types';
 import { Address } from 'viem';
 import { SupabaseService } from '../supabase/supabase.service';
 import { Collection } from '../supabase/entities/collections';
+import { WhaleDetection } from './entities/discovery.type';
+import { AnalysisService } from '../analysis/analysis.service';
 
 @Injectable()
 export class DiscoveryService {
   constructor(
     private readonly graphService: GraphService,
     private readonly supabaseService: SupabaseService,
+    private readonly analysisService: AnalysisService,
   ) {}
 
-  public async findWhales(): Promise<Address[]> {
+  public async discoverWhales(): Promise<void> {
+    const whales = await this.findWhales();
+
+    for (const whale of whales) {
+      await this.analysisService.analyseWallet(whale.address);
+    }
+  }
+
+  public async findWhales(): Promise<WhaleDetection[]> {
     const recentTransfers = await this.queryLargeTransfers();
 
-    const whalesSet: Set<Address> = new Set();
+    const whalesMap: Map<Address, WhaleDetection> = new Map();
 
     recentTransfers.forEach((transfer) => {
-      whalesSet.add(transfer.initiator);
+      const { transactionHash, initiator } = transfer;
+
+      if (!whalesMap.has(initiator)) {
+        whalesMap.set(initiator, { address: initiator, transactionHash });
+      }
     });
 
-    const whales = Array.from(whalesSet);
+    const whales = Array.from(whalesMap.values());
 
     return whales;
   }
 
-  public async saveWhales(whaleAddresses: Address[]): Promise<void> {
+  public async saveWhales(detectedWhales: WhaleDetection[]): Promise<void> {
     const now = new Date();
 
-    const whalesInfo = whaleAddresses.map((address) => ({
+    const whalesInfo = detectedWhales.map(({ address, transactionHash }) => ({
       whale_address: address,
+      detected_transaction_id: transactionHash,
       first_seen: now,
       last_seen: now,
     }));
