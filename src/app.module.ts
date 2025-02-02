@@ -16,7 +16,7 @@ import { envSchema } from 'config/env.validation';
       isGlobal: true,
     }),
     OpenAIModule.forRoot({
-      openai: process.env.OPENAI_API_KEY,
+      openAiApiKey: process.env.OPENAI_API_KEY,
     }),
     AlchemyModule.forRoot({
       apiKey: process.env.ALCHEMY_API_KEY,

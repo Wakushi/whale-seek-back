@@ -1,9 +1,10 @@
+import { OpenAIController } from './openai.controllers';
 import { OpenAIService } from './openai.service';
 import { DynamicModule, Module } from '@nestjs/common';
 
 @Module({})
 export class OpenAIModule {
-  static forRoot(config: { openai: string }): DynamicModule {
+  static forRoot(config: { openAiApiKey: string }): DynamicModule {
     return {
       module: OpenAIModule,
       providers: [
@@ -14,6 +15,7 @@ export class OpenAIModule {
         OpenAIService,
       ],
       exports: [OpenAIService],
+      controllers: [OpenAIController],
       global: true,
     };
   }

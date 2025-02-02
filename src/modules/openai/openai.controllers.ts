@@ -1,12 +1,13 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode } from '@nestjs/common';
 import { OpenAIService } from './openai.service';
 
-@Controller('openai')
+@Controller('agent')
 export class OpenAIController {
   constructor(private readonly openaiService: OpenAIService) {}
 
-  @Post('wallet')
-  async getWeatherInfo(@Body() body: { query: string }) {
-    return await this.openaiService.queryWallet(body.query);
+  @Post()
+  @HttpCode(200)
+  async askAgent(@Body() body: { query: string }) {
+    return await this.openaiService.askAgent(body.query);
   }
 }
