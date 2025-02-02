@@ -43,7 +43,7 @@ export class AlchemyService {
       return {
         name: metadata.name || 'Unknown Token',
         symbol: metadata.symbol || 'UNKNOWN',
-        decimals: metadata.decimals || 18, // Par défaut, 18 décimales
+        decimals: metadata.decimals || 18, 
       };
     } catch (error) {
       console.error('Error fetching token metadata:', error);
@@ -82,8 +82,6 @@ export class AlchemyService {
       if (!this._client) {
         throw new Error('Alchemy client is not initialized.');
       }
-
-      // Récupérer les soldes bruts
       const balances = await this._client.core.getTokenBalances(walletAddress, {
         type: TokenBalanceType.ERC20,
       });

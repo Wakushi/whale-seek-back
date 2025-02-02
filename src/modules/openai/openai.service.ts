@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 import { AlchemyService } from '../alchemy/alchemy.service';
+import { TokensService } from '../tokens/tokens.services';
 
 @Injectable()
 export class OpenAIService {
@@ -9,55 +10,58 @@ export class OpenAIService {
   constructor(
     @Inject('OPENAI_CONFIG') private readonly config: { openai: string },
     private alchemyService: AlchemyService,
+    private tokensService: TokensService,
   ) {
     this.openai = new OpenAI({
       apiKey: config.openai,
     });
   }
 
-
-  tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+  tools: any[] = [
     {
       type: 'function',
       function: {
-        name: 'get_token_balances', 
-        description: 'Récupère les balances des tokens ERC-20 pour une adresse de wallet donnée.', 
+        description: 'Retrieves the ERC-20 token balances for a given wallet address.',
+        parse: JSON.parse,
         parameters: {
           type: 'object',
           properties: {
             walletAddress: {
               type: 'string',
-              description: 'L\'adresse du wallet pour laquelle récupérer les balances des tokens.',
             },
           },
-          required: ['walletAddress'], 
         },
+        function: (wallet: any) =>
+          this.alchemyService.getTokenBalances(wallet.walletAddress),
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        description: 'Retrieves the market data of a token based on its ID.',
+        parse: JSON.parse,
+        parameters: {
+          type: 'object',
+          properties: {
+            tokenName: { type: 'string' },
+          },
+        },
+        function: (tokenName: any) => this.tokensService.getTokenMarketDataById(tokenName.tokenName),
       },
     },
   ];
 
   async queryWallet(userQuery: string): Promise<string> {
-    const response = await this.openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: userQuery }],
-      tools: this.tools,
-      tool_choice: 'auto', 
-    });
+    const runner = this.openai.beta.chat.completions
+      .runTools({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: userQuery }],
+        tools: this.tools,
+      })
+      .on('message', (message) => console.log(message));
 
-    const toolCalls = response.choices[0].message.tool_calls;
-    if (toolCalls && toolCalls.length > 0) {
-      for (const toolCall of toolCalls) {
-        if (toolCall.function.name === 'get_token_balances') {
-          const args = JSON.parse(toolCall.function.arguments);
-          const walletAddress = args.walletAddress;
+    const finalContent = await runner.finalContent();
 
-          const balances = await this.alchemyService.getTokenBalances(walletAddress);
-
-          return JSON.stringify(balances);
-        }
-      }
-    }
-
-    return response.choices[0].message.content || 'Aucune réponse trouvée.';
+    return finalContent;
   }
 }

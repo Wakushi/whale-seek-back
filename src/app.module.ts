@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { envSchema } from './config/env.validation';
 import { AlchemyModule } from './modules/alchemy/alchemy.module';
 import { Network } from 'alchemy-sdk';
+import { TokensModule } from './modules/tokens/tokens.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { Network } from 'alchemy-sdk';
       apiKey: process.env.ALCHEMY_API_KEY,
       network: Network.BASE_SEPOLIA,
     }),
+    TokensModule.forRoot(),
   ],
 
   controllers: [OpenAIController],
