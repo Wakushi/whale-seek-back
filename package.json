@@ -24,6 +24,8 @@
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
+    "alchemy-sdk": "^3.5.1",
+    "openai": "^4.82.0",
     "graphql": "^16.10.0",
     "graphql-request": "^5.2.0",
     "reflect-metadata": "^0.2.0",
