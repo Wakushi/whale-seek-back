@@ -19,7 +19,7 @@ export class GraphService {
   async queryLargeWethTransfers({
     fromTimestamp,
     minWethTransfered = 100,
-    maxResults = 100,
+    maxResults = 200,
   }: {
     fromTimestamp: number;
     minWethTransfered?: number;

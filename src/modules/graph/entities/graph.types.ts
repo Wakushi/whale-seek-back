@@ -1,8 +1,10 @@
+import { Address } from 'viem';
+
 export interface WethTransferQuery {
   id: string;
-  initiator: string;
+  initiator: Address;
   wad: string;
-  src: string;
-  dst: string;
+  src: Address;
+  dst: Address;
   blockTimestamp: string;
 }
