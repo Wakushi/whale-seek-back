@@ -7,10 +7,18 @@ import { Address } from 'viem';
 export class DiscoveryService {
   constructor(private readonly graphService: GraphService) {}
 
-  async findWhales(): Promise<any> {
+  async findWhales(): Promise<Address[]> {
     const recentTransfers = await this.queryLargeTransfers();
 
-    const whales: Set<Address> = new Set();
+    const whalesSet: Set<Address> = new Set();
+
+    recentTransfers.forEach((transfer) => {
+      whalesSet.add(transfer.initiator);
+    });
+
+    const whales = Array.from(whalesSet);
+
+    return whales;
   }
 
   async queryLargeTransfers(): Promise<WethTransferQuery[]> {
@@ -21,7 +29,7 @@ export class DiscoveryService {
     try {
       const transfers = await this.graphService.queryLargeWethTransfers({
         fromTimestamp: oneMonthAgo,
-        minWethTransfered: 100,
+        minWethTransfered: 50,
       });
 
       return transfers;

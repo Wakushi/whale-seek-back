@@ -8,6 +8,7 @@ export class DiscoveryController {
   @Get()
   @HttpCode(200)
   async testEndpoint() {
-    this.discoveryService.findWhales();
+    const whales = await this.discoveryService.findWhales();
+    return whales;
   }
 }
