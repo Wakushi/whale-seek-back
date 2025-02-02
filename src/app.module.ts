@@ -7,6 +7,7 @@ import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { GraphModule } from './modules/graph/graph.module';
 import { ConfigModule } from '@nestjs/config';
 import { envSchema } from 'config/env.validation';
+import { SupabaseModule } from './modules/supabase/supabase.module';
 
 @Module({
   imports: [
@@ -21,6 +22,10 @@ import { envSchema } from 'config/env.validation';
     AlchemyModule.forRoot({
       apiKey: process.env.ALCHEMY_API_KEY,
       network: Network.BASE_SEPOLIA,
+    }),
+    SupabaseModule.forRoot({
+      privateKey: process.env.SUPABASE_API_KEY,
+      url: process.env.SUPABASE_URL,
     }),
     TokensModule.forRoot(),
     GraphModule.forRoot({ graphApiKey: process.env.GRAPH_API_KEY }),
