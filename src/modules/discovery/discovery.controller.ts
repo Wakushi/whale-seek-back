@@ -1,18 +1,13 @@
 import { Controller, Get, HttpCode } from '@nestjs/common';
-import { GraphService } from '../graph/graph.service';
+import { DiscoveryService } from './discovery.service';
 
 @Controller('discovery')
 export class DiscoveryController {
-  constructor(private readonly graphService: GraphService) {}
+  constructor(private readonly discoveryService: DiscoveryService) {}
 
   @Get()
   @HttpCode(200)
-  async queryGraph() {
-    try {
-      const result = await this.graphService.queryUniswapData();
-      return result;
-    } catch (error) {
-      console.error(error);
-    }
+  async testEndpoint() {
+    this.discoveryService.findWhales();
   }
 }
