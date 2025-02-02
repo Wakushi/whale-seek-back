@@ -14,6 +14,7 @@ export class OpenAIService {
     {
       type: 'function',
       function: {
+        name: 'getTokenBalances',
         description:
           'Retrieves the ERC-20 token balances for a given wallet address.',
         parse: JSON.parse,
@@ -32,6 +33,7 @@ export class OpenAIService {
     {
       type: 'function',
       function: {
+        name: 'getTokenMarketDataById',
         description: 'Retrieves the market data of a token based on its ID.',
         parse: JSON.parse,
         parameters: {
@@ -47,6 +49,7 @@ export class OpenAIService {
     {
       type: 'function',
       function: {
+        name: "search",
         description : 'internet search',
         parse: JSON.parse,
         parameters: {
@@ -97,8 +100,10 @@ export class OpenAIService {
 
     if (!isUsingTool) return;
 
+
     message.tool_calls.forEach((tool: any) => {
       let info = '';
+      console.log(tool)
 
       switch (tool.function.name) {
         case 'getTokenBalances':
