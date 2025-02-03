@@ -12,6 +12,7 @@ import { AnalysisModule } from './modules/analysis/analysis.module';
 import { BlockExplorerModule } from './modules/block-explorer/block-explorer.module';
 import { ContractModule } from './modules/contract/contract.module';
 import { BraveModule } from './modules/brave/brave.module';
+import { WebhookModule } from './modules/webhook/webhook.module';
 
 @Module({
   imports: [
@@ -39,6 +40,8 @@ import { BraveModule } from './modules/brave/brave.module';
     ContractModule.forRoot({
       rpcUrl: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
     }),
+    WebhookModule.forRoot()
+
   ],
 })
 export class AppModule {}

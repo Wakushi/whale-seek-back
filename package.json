@@ -27,6 +27,8 @@
     "@nestjs/platform-express": "^10.0.0",
     "@supabase/supabase-js": "^2.48.1",
     "alchemy-sdk": "^3.5.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
     "ethers": "^6.13.5",
     "graphql": "^16.10.0",
     "graphql-request": "^5.2.0",
