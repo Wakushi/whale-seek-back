@@ -1,14 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { GraphService } from '../graph/graph.service';
 import { WethTransferQuery } from '../graph/entities/graph.types';
 import { Address } from 'viem';
 import { SupabaseService } from '../supabase/supabase.service';
 import { Collection } from '../supabase/entities/collections';
-import { WhaleDetection } from './entities/discovery.type';
+import { Whale, WhaleDetection } from './entities/discovery.type';
 import { AnalysisService } from '../analysis/analysis.service';
 
 @Injectable()
 export class DiscoveryService {
+  private readonly logger = new Logger(DiscoveryService.name);
+
   constructor(
     private readonly graphService: GraphService,
     private readonly supabaseService: SupabaseService,
@@ -16,10 +18,20 @@ export class DiscoveryService {
   ) {}
 
   public async discoverWhales(): Promise<void> {
-    const whales = await this.findWhales();
+    // const whales = await this.findWhales();
 
-    for (const whale of whales) {
-      await this.analysisService.analyseWallet(whale.address);
+    const whales = await this.supabaseService.getAll<Whale>(
+      Collection.WHALE_INFO,
+    );
+
+    // FOR TESTING PURPOSES
+    const SMALL_SAMPLE: Address[] = [
+      '0xa30965a445963ab0d016c86df1a905c2f58b379f',
+    ];
+
+    for (const whale of SMALL_SAMPLE) {
+      this.logger.log(`Analysing whale ${whale}`);
+      await this.analysisService.analyseWallet(whale);
     }
   }
 
@@ -41,7 +53,7 @@ export class DiscoveryService {
     return whales;
   }
 
-  public async saveWhales(detectedWhales: WhaleDetection[]): Promise<void> {
+  private async saveWhales(detectedWhales: WhaleDetection[]): Promise<void> {
     const now = new Date();
 
     const whalesInfo = detectedWhales.map(({ address, transactionHash }) => ({

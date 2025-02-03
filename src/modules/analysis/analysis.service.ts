@@ -1,20 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { TokensService } from '../tokens/tokens.services';
 import { AlchemyService } from '../alchemy/alchemy.service';
 import { Address } from 'viem';
 import { BlockExplorerService } from '../block-explorer/block-explorer.service';
-import { ContractService } from '../contract/contract.service';
-import { Transaction } from '../block-explorer/entities/transaction.type';
-import { isDexContract } from 'src/utils/source-code.helper';
-import { Wallet } from '../tokens/entities/token.type';
+import { AssetTransfersResult } from 'alchemy-sdk';
+import { MOCK_TRANSFERS } from './mock-transfer';
+
+type FormattedTransfer = {
+  transactionHash: string;
+  timestamp: number;
+  type: 'SELL' | 'BUY';
+  value: number;
+};
 
 @Injectable()
 export class AnalysisService {
+  private readonly logger = new Logger(AnalysisService.name);
+
   constructor(
     private readonly alchemyService: AlchemyService,
     private readonly tokenService: TokensService,
     private readonly blockExplorerService: BlockExplorerService,
-    private readonly contractService: ContractService,
   ) {}
 
   // We create some pre-worked data to then pass to the agent because here we
@@ -24,59 +30,72 @@ export class AnalysisService {
   // Should return an analysis with a score
   public async analyseWallet(wallet: Address): Promise<void> {
     try {
-      const walletHoldings: Wallet =
-        await this.alchemyService.getTokenBalances(wallet);
+      // const walletHoldings: Wallet =
+      //   await this.alchemyService.getTokenBalances(wallet);
 
-      const transactions = await this.analyseTransactions(wallet);
+      // const transfers =
+      //   await this.alchemyService.getWalletTokenTransfers(wallet);
+
+      // this.logger.log(
+      //   `Found ${transfers.length} ERC20 transfers for wallet ${wallet}!`,
+      // );
+
+      await this.analyseTransfers(MOCK_TRANSFERS, wallet);
     } catch (error) {
       console.error('Error analysing wallet: ', error);
     }
   }
 
-  public async analyseTransactions(wallet: Address): Promise<Transaction[]> {
-    const transactions =
-      await this.blockExplorerService.fetchBaseTransactionByWallet({
-        walletAddress: wallet,
-        startDate: new Date('2025-01-01'),
-        endDate: new Date(),
-      });
+  private async analyseTransfers(
+    transfers: AssetTransfersResult[],
+    wallet: Address,
+  ) {
+    const tokenTransfers: Map<string, AssetTransfersResult[]> = new Map();
 
-    const transactionsByContract: Map<string, Transaction[]> = new Map();
+    transfers.forEach((transfer) => {
+      const tokenAddress = transfer.rawContract.address;
 
-    transactions.forEach((transaction) => {
-      const interactedAddress =
-        transaction.from === wallet ? transaction.to : transaction.from;
-
-      if (!this.isContract(interactedAddress)) return;
-
-      if (!transactionsByContract.has(interactedAddress)) {
-        transactionsByContract.set(interactedAddress, [transaction]);
+      if (tokenTransfers.has(tokenAddress)) {
+        tokenTransfers.set(tokenAddress, [
+          ...tokenTransfers.get(tokenAddress),
+          transfer,
+        ]);
         return;
       }
 
-      transactionsByContract.set(interactedAddress, [
-        ...transactionsByContract.get(interactedAddress),
-        transaction,
-      ]);
+      tokenTransfers.set(tokenAddress, [transfer]);
     });
 
-    for (const [contract, _] of transactionsByContract.entries()) {
-      const sourceCode = await this.blockExplorerService.fetchSourceCode(
-        contract as Address,
-      );
-
-      if (!sourceCode) continue;
-
-      const dexAnalysis = isDexContract(sourceCode);
-
-      console.log(`DEX analysis for ${contract}: `, dexAnalysis);
+    for (const [token, transfers] of tokenTransfers.entries()) {
+      const formattedTransfers = await this.formatTransfer(transfers, wallet);
     }
-
-    return transactions;
   }
 
-  async isContract(address: string) {
-    const code = await this.contractService.provider.getCode(address);
-    return code !== '0x';
+  private async formatTransfer(
+    transfers: AssetTransfersResult[],
+    wallet: Address,
+  ): Promise<FormattedTransfer[]> {
+    const formattedTransfers: FormattedTransfer[] = [];
+
+    for (const transfer of transfers) {
+      const { blockNum, hash, from, value } = transfer;
+
+      try {
+        const block = await this.alchemyService.client.core.getBlock(blockNum);
+
+        const timestamp = block.timestamp;
+
+        formattedTransfers.push({
+          timestamp,
+          transactionHash: hash,
+          type: from === wallet ? 'SELL' : 'BUY',
+          value: value ?? 0,
+        });
+      } catch (error) {
+        console.log('Error formatting transfers: ', error);
+      }
+    }
+
+    return formattedTransfers.sort((a, b) => a.timestamp - b.timestamp);
   }
 }
