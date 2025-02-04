@@ -5,16 +5,24 @@ import { WebhookService } from './webhook.service';
 export class WebhookController {
   constructor(private readonly webhookService: WebhookService) {}
 
-  @Patch('update-addresses')
-  async updateAddresses(
-    @Headers('X-Alchemy-Token') token: string,
-    @Body() updateDto
+  @Patch('add-addresses')
+  async addAddresses(
+    @Headers('X-Alchemy-Token')
+    @Body() updateDto: { webhook_id: string; addresses_to_add: string[] }
   ) {
-    return this.webhookService.updateAddresses(token, updateDto);
+    return this.webhookService.addAddresses(updateDto);
   }
 
-  @Post('transaction')  
-  async handleTransaction(@Req() request, @Body() data: any) { 
+  @Patch('remove-addresses')
+  async removeAddresses(
+    @Headers('X-Alchemy-Token')
+    @Body() updateDto: { webhook_id: string; addresses_to_remove: string[] }
+  ) {
+    return this.webhookService.removeAddresses(updateDto);
+  }
+
+  @Post('transaction')
+  async handleTransaction(@Req() request, @Body() data: any) {
     return this.webhookService.processTransaction(data);
   }
 }

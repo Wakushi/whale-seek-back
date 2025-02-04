@@ -6,6 +6,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { Collection } from '../supabase/entities/collections';
 import { WhaleDetection } from './entities/discovery.type';
 import { AnalysisService } from '../analysis/analysis.service';
+import { WebhookService } from '../webhook/webhook.service';
 
 @Injectable()
 export class DiscoveryService {
@@ -13,6 +14,7 @@ export class DiscoveryService {
     private readonly graphService: GraphService,
     private readonly supabaseService: SupabaseService,
     private readonly analysisService: AnalysisService,
+    private readonly webhookService: WebhookService,
   ) {}
 
   public async discoverWhales(): Promise<void> {
@@ -56,6 +58,16 @@ export class DiscoveryService {
       items: whalesInfo,
       conflictTarget: 'whale_address',
     });
+
+    try {
+      const addresses = detectedWhales.map(whale => whale.address);
+      await this.webhookService.addAddresses({
+        addresses_to_add: addresses
+      });
+      console.log(`Successfully added ${addresses.length} whale addresses to webhook tracking`);
+    } catch (error) {
+      console.error('Error adding addresses to webhook:', error);
+    }
   }
 
   private async queryLargeTransfers(): Promise<WethTransferQuery[]> {

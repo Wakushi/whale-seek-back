@@ -4,10 +4,16 @@ import { WebhookController } from './webhook.controller';
 
 @Module({})
 export class WebhookModule {
-  static forRoot(): DynamicModule {
+  static forRoot(config: { alchemyAuthKey: string, webhookId: string }): DynamicModule {
     return {
       module: WebhookModule,
-      providers: [WebhookService],
+      providers: [
+        WebhookService,
+        {
+          provide: 'WEBHOOK_CONFIG',
+          useValue: config,
+        }
+      ],
       controllers: [WebhookController],
       exports: [WebhookService],
       global: true,

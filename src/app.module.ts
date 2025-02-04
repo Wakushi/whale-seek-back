@@ -40,7 +40,10 @@ import { WebhookModule } from './modules/webhook/webhook.module';
     ContractModule.forRoot({
       rpcUrl: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
     }),
-    WebhookModule.forRoot()
+    WebhookModule.forRoot({ 
+      alchemyAuthKey: process.env.ALCHEMY_AUTH_KEY,
+      webhookId : process.env.WEBHOOK_ID
+    })
 
   ],
 })

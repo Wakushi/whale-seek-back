@@ -1,13 +1,51 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Inject } from '@nestjs/common';
 import fetch from 'node-fetch';
 import { SupabaseService } from '../supabase/supabase.service';
 import { Collection } from '../supabase/entities/collections';
 
-
 @Injectable()
 export class WebhookService {
-  constructor(private readonly supabaseService: SupabaseService) {}
-  async updateAddresses(token: string, updateDto) {
+  constructor(
+    @Inject('WEBHOOK_CONFIG')
+    private readonly supabaseService: SupabaseService,
+    private readonly config: { alchemyAuthKey: string; webhookId: string },
+    ) {}
+
+    async addAddresses(updateDto: { addresses_to_add: string[] }) {
+      try {
+        const response = await fetch(
+          'https://dashboard.alchemy.com/api/update-webhook-addresses',
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Alchemy-Token': this.config.alchemyAuthKey,
+            },
+            body: JSON.stringify({
+              webhook_id: this.config.webhookId,
+              addresses_to_add: updateDto.addresses_to_add || [],
+              addresses_to_remove: [], 
+            }),
+          },
+        );
+  
+        if (!response.ok) {
+          throw new HttpException(await response.text(), response.status);
+        }
+  
+        return await response.json();
+      } catch (error) {
+        if (error instanceof HttpException) {
+          throw error;
+        }
+        throw new HttpException(
+          'Failed to add webhook addresses',
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+    }
+
+  async removeAddresses(updateDto: { webhook_id: string; addresses_to_remove: string[] }) {
     try {
       const response = await fetch(
         'https://dashboard.alchemy.com/api/update-webhook-addresses',
@@ -15,11 +53,11 @@ export class WebhookService {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'X-Alchemy-Token': token,
+            'X-Alchemy-Token': this.config.alchemyAuthKey,
           },
           body: JSON.stringify({
-            webhook_id: updateDto.webhook_id,
-            addresses_to_add: updateDto.addresses_to_add || [],
+            webhook_id: this.config.webhookId,
+            addresses_to_add: [],
             addresses_to_remove: updateDto.addresses_to_remove || [],
           }),
         },
@@ -35,12 +73,12 @@ export class WebhookService {
         throw error;
       }
       throw new HttpException(
-        'Failed to update webhook addresses',
+        'Failed to remove webhook addresses',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
-  
+
   async processTransaction(webhookData) {
     try {
       const transactions = webhookData.event.activity.map(async (activity) => {
@@ -79,4 +117,3 @@ export class WebhookService {
     }
   }
 }
-
