@@ -24,32 +24,113 @@ export class TokensService {
   async getTokenMarketDataById(tokenName: string): Promise<any> {
     try {
       const tokenId = await this.getTokenIdByName(tokenName);
-
+  
       if (!tokenId) {
         throw new Error(`Token with name "${tokenName}" not found.`);
       }
-
-      const url = `${this.COINGECKO_API}/coins/${tokenId}`;
+  
+      const url = `${this.COINGECKO_API}/coins/${tokenId}?localization=false&tickers=true&market_data=true&community_data=true&developer_data=true&sparkline=true`;
       const response = await fetch(url);
-
+  
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-
+  
       const data = await response.json();
       const marketData = data.market_data;
-
+  
       return {
+        // Informations de base
         name: data.name,
         symbol: data.symbol,
-        currentPrice: marketData.current_price.usd,
-        marketCap: marketData.market_cap.usd,
-        totalVolume: marketData.total_volume.usd,
-        priceChange24h: marketData.price_change_percentage_24h,
+        description: data.description.en,
+        genesis_date: data.genesis_date,
+        categories: data.categories,
+        
+        // Données de marché
+        market_data: {
+          current_price: marketData.current_price,
+          market_cap: marketData.market_cap,
+          total_volume: marketData.total_volume,
+          fully_diluted_valuation: marketData.fully_diluted_valuation,
+          circulating_supply: marketData.circulating_supply,
+          total_supply: marketData.total_supply,
+          max_supply: marketData.max_supply,
+          
+          // Métriques de performance
+          price_change_percentage: {
+            '1h': marketData.price_change_percentage_1h_in_currency,
+            '24h': marketData.price_change_percentage_24h_in_currency,
+            '7d': marketData.price_change_percentage_7d_in_currency,
+            '14d': marketData.price_change_percentage_14d_in_currency,
+            '30d': marketData.price_change_percentage_30d_in_currency,
+            '1y': marketData.price_change_percentage_1y_in_currency,
+          },
+          
+          // Données de trading
+          high_24h: marketData.high_24h,
+          low_24h: marketData.low_24h,
+          ath: marketData.ath,
+          ath_date: marketData.ath_date,
+          atl: marketData.atl,
+          atl_date: marketData.atl_date,
+        },
+  
+        // Données communautaires
+        community_data: {
+          twitter_followers: data.community_data.twitter_followers,
+          reddit_subscribers: data.community_data.reddit_subscribers,
+          reddit_average_posts_48h: data.community_data.reddit_average_posts_48h,
+          reddit_average_comments_48h: data.community_data.reddit_average_comments_48h,
+          telegram_channel_user_count: data.community_data.telegram_channel_user_count,
+        },
+  
+        // Données développeurs
+        developer_data: {
+          forks: data.developer_data.forks,
+          stars: data.developer_data.stars,
+          subscribers: data.developer_data.subscribers,
+          total_issues: data.developer_data.total_issues,
+          closed_issues: data.developer_data.closed_issues,
+          pull_requests_merged: data.developer_data.pull_requests_merged,
+          pull_request_contributors: data.developer_data.pull_request_contributors,
+          code_additions_4_weeks: data.developer_data.code_additions_deletions_4_weeks?.additions,
+          code_deletions_4_weeks: data.developer_data.code_additions_deletions_4_weeks?.deletions,
+          commit_count_4_weeks: data.developer_data.commit_count_4_weeks,
+        },
+  
+        // Liens importants
+        links: {
+          homepage: data.links?.homepage,
+          blockchain_site: data.links?.blockchain_site,
+          official_forum_url: data.links?.official_forum_url,
+          chat_url: data.links?.chat_url,
+          announcement_url: data.links?.announcement_url,
+          twitter_screen_name: data.links?.twitter_screen_name,
+          telegram_channel_identifier: data.links?.telegram_channel_identifier,
+          github_repo: data.links?.repos_url?.github,
+        },
+  
+        // Liquidité et exchanges
+        tickers: data.tickers?.map((ticker: any) => ({
+          exchange: ticker.market.name,
+          pair: ticker.target,
+          volume: ticker.volume,
+          trade_url: ticker.trade_url,
+          trust_score: ticker.trust_score,
+        })),
+  
+        // Score de confiance
+        coingecko_scores: {
+          developer_score: data.developer_score,
+          community_score: data.community_score,
+          liquidity_score: data.liquidity_score,
+          public_interest_score: data.public_interest_score,
+        },
       };
     } catch (error) {
-      console.error('Error fetching token market data by name:', error);
-      throw new Error('Failed to fetch token market data by name');
+      console.error('Error fetching token market data:', error);
+      throw new Error('Failed to fetch token market data');
     }
   }
 
