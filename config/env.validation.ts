@@ -8,6 +8,9 @@ export const envSchema = z.object({
   SUPABASE_URL: z.string(),
   SUPABASE_API_KEY: z.string(),
   BASESCAN_API_KEY: z.string(),
+  BRAVE_API_KEY: z.string(),
+  WEBHOOK_ID: z.string(),
+  ALCHEMY_AUTH_KEY: z.string(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
