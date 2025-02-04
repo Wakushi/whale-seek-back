@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Alchemy, Network, TokenBalanceType } from 'alchemy-sdk';
+import {
+  Alchemy,
+  AssetTransfersCategory,
+  AssetTransfersResult,
+  Network,
+} from 'alchemy-sdk';
 import { hexToDecimal } from 'src/utils/math.helper';
 import { Address } from 'viem';
 import {
@@ -110,5 +115,22 @@ export class AlchemyService {
    */
   private async getTokenPriceInUSD(contractAddress: string): Promise<number> {
     return 0;
+  }
+
+  public async getWalletTokenTransfers(
+    walletAddress: Address,
+  ): Promise<AssetTransfersResult[]> {
+    try {
+      const data = await this.client.core.getAssetTransfers({
+        fromBlock: '0x0',
+        fromAddress: walletAddress,
+        category: [AssetTransfersCategory.ERC20],
+      });
+
+      return data.transfers;
+    } catch (error) {
+      console.log(`Error fetching token transfers for wallet ${walletAddress}`);
+      return [];
+    }
   }
 }

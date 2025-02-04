@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { GraphService } from '../graph/graph.service';
 import { WethTransferQuery } from '../graph/entities/graph.types';
 import { Address } from 'viem';
@@ -9,6 +9,8 @@ import { AnalysisService } from '../analysis/analysis.service';
 
 @Injectable()
 export class DiscoveryService {
+  private readonly logger = new Logger(DiscoveryService.name);
+
   constructor(
     private readonly graphService: GraphService,
     private readonly supabaseService: SupabaseService,
@@ -19,8 +21,11 @@ export class DiscoveryService {
     const whales = await this.findWhales();
 
     for (const whale of whales) {
+      this.logger.log(`Analysing whale ${whale.address}`);
       await this.analysisService.analyseWallet(whale.address);
     }
+
+    this.logger.log(`Completed analysis of ${whales.length} whales!`);
   }
 
   public async findWhales(): Promise<WhaleDetection[]> {
@@ -41,7 +46,7 @@ export class DiscoveryService {
     return whales;
   }
 
-  public async saveWhales(detectedWhales: WhaleDetection[]): Promise<void> {
+  private async saveWhales(detectedWhales: WhaleDetection[]): Promise<void> {
     const now = new Date();
 
     const whalesInfo = detectedWhales.map(({ address, transactionHash }) => ({

@@ -33,7 +33,7 @@ import { BraveModule } from './modules/brave/brave.module';
     }),
     TokensModule.forRoot(),
     GraphModule.forRoot({ graphApiKey: process.env.GRAPH_API_KEY }),
-    BraveModule.forRoot({apiKey: process.env.BRAVE_API_KEY}),
+    BraveModule.forRoot({ apiKey: process.env.BRAVE_API_KEY }),
     AnalysisModule.forRoot(),
     BlockExplorerModule.forRoot({ apiKey: process.env.BASESCAN_API_KEY }),
     ContractModule.forRoot({
