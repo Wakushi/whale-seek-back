@@ -4,8 +4,11 @@ import { WethTransferQuery } from '../graph/entities/graph.types';
 import { Address } from 'viem';
 import { SupabaseService } from '../supabase/supabase.service';
 import { Collection } from '../supabase/entities/collections';
-import { WhaleDetection } from './entities/discovery.type';
+import { Whale, WhaleDetection } from './entities/discovery.type';
 import { AnalysisService } from '../analysis/analysis.service';
+import { AccountAnalysis } from '../analysis/entities/analysis.type';
+import { TokensService } from '../tokens/tokens.services';
+import { sortWhalesByEfficiency } from 'src/utils/performances.helper';
 import { WebhookService } from '../webhook/webhook.service';
 
 @Injectable()
@@ -16,18 +19,59 @@ export class DiscoveryService {
     private readonly graphService: GraphService,
     private readonly supabaseService: SupabaseService,
     private readonly analysisService: AnalysisService,
+    private readonly tokenService: TokensService,
     private readonly webhookService: WebhookService,
   ) {}
 
   public async discoverWhales(): Promise<void> {
-    const whales = await this.findWhales();
+    const foundWhales = await this.findWhales();
 
-    for (const whale of whales) {
-      this.logger.log(`Analysing whale ${whale.address}`);
-      await this.analysisService.analyseWallet(whale.address);
+    const registeredWhales = await this.supabaseService.getAll<Whale>(
+      Collection.WHALE_INFO,
+    );
+
+    const newWhales = foundWhales.filter(
+      (foundWhale) =>
+        !registeredWhales.some(
+          (registeredWhale) =>
+            registeredWhale.whale_address === foundWhale.address,
+        ),
+    );
+
+    this.logger.log(`Detected ${newWhales.length} new whales...`);
+
+    const walletScores: Map<WhaleDetection, AccountAnalysis> = new Map();
+
+    const coinCodexList = await this.tokenService.getCoinCodexCoinList();
+
+    if (!coinCodexList || !coinCodexList.length) {
+      this.logger.log('Coin Codex list not fetched, cancelling discovery');
+      return;
     }
 
-    this.logger.log(`Completed analysis of ${whales.length} whales!`);
+    for (const whale of newWhales) {
+      this.logger.log(`Analysing whale ${whale.address}`);
+
+      const accountAnalysis = await this.analysisService.analyseAccount(
+        whale.address,
+        coinCodexList,
+      );
+
+      if (!accountAnalysis) continue;
+
+      walletScores.set(whale, accountAnalysis);
+    }
+
+    const sortedWhales = sortWhalesByEfficiency(walletScores);
+    const filteredWhales = sortedWhales.filter((whale) => whale.score > 70);
+
+    if (filteredWhales.length) {
+      await this.saveWhales(filteredWhales.map((w) => w.whaleDetection));
+    }
+
+    this.logger.log(
+      `Completed whale discovery. Saved ${filteredWhales.length} new whales!`,
+    );
   }
 
   public async findWhales(): Promise<WhaleDetection[]> {
@@ -65,11 +109,13 @@ export class DiscoveryService {
     });
 
     try {
-      const addresses = detectedWhales.map(whale => whale.address);
+      const addresses = detectedWhales.map((whale) => whale.address);
       await this.webhookService.addAddresses({
-        addresses_to_add: addresses
+        addresses_to_add: addresses,
       });
-      console.log(`Successfully added ${addresses.length} whale addresses to webhook tracking`);
+      this.logger.log(
+        `Successfully added ${addresses.length} whale addresses to webhook tracking`,
+      );
     } catch (error) {
       console.error('Error adding addresses to webhook:', error);
     }

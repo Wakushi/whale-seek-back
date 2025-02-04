@@ -286,6 +286,7 @@ export class TokensService {
 
       return data;
     } catch (error) {
+      console.error('Error fetching coin codex list: ', error);
       return [];
     }
   }

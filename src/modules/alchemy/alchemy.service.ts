@@ -3,6 +3,8 @@ import {
   Alchemy,
   AssetTransfersCategory,
   AssetTransfersResult,
+  AssetTransfersWithMetadataParams,
+  AssetTransfersWithMetadataResponse,
   Network,
 } from 'alchemy-sdk';
 import { hexToDecimal } from 'src/utils/math.helper';
@@ -121,15 +123,67 @@ export class AlchemyService {
     walletAddress: Address,
   ): Promise<AssetTransfersResult[]> {
     try {
-      const data = await this.client.core.getAssetTransfers({
-        fromBlock: '0x0',
-        fromAddress: walletAddress,
-        category: [AssetTransfersCategory.ERC20],
-      });
+      const allTransfers: AssetTransfersResult[] = [];
 
-      return data.transfers;
-    } catch (error) {
-      console.log(`Error fetching token transfers for wallet ${walletAddress}`);
+      const getTransfers = async (
+        type: 'from' | 'to',
+        pageKey?: string,
+      ): Promise<AssetTransfersWithMetadataResponse> => {
+        const payload: AssetTransfersWithMetadataParams = {
+          category: [
+            AssetTransfersCategory.EXTERNAL,
+            AssetTransfersCategory.ERC20,
+          ],
+          withMetadata: true,
+        };
+
+        if (type === 'from') {
+          payload.fromAddress = walletAddress;
+        } else {
+          payload.toAddress = walletAddress;
+        }
+
+        if (pageKey) {
+          payload.pageKey = pageKey;
+        }
+
+        const data = await this.client.core.getAssetTransfers(payload);
+
+        return data;
+      };
+
+      const getAllPageTransfers = async (
+        type: 'from' | 'to',
+      ): Promise<AssetTransfersResult[]> => {
+        const transfers: AssetTransfersResult[] = [];
+
+        let lastPageKey = '';
+
+        const firstTransfer = await getTransfers(type);
+        transfers.push(...firstTransfer.transfers);
+
+        lastPageKey = firstTransfer.pageKey;
+
+        while (lastPageKey) {
+          const transfer = await getTransfers(type, lastPageKey);
+          transfers.push(...transfer.transfers);
+          lastPageKey = transfer?.pageKey || '';
+        }
+
+        return transfers;
+      };
+
+      const allFromTransfers = await getAllPageTransfers('from');
+      const allToTransfers = await getAllPageTransfers('to');
+
+      allTransfers.push(...allFromTransfers, ...allToTransfers);
+
+      return allTransfers;
+    } catch (error: any) {
+      console.log(
+        `Error fetching token transfers for wallet ${walletAddress}`,
+        error.body,
+      );
       return [];
     }
   }
