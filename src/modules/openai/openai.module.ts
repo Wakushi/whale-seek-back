@@ -1,3 +1,4 @@
+import { AgentToolService } from './agent-tools.service';
 import { OpenAIController } from './openai.controllers';
 import { OpenAIService } from './openai.service';
 import { DynamicModule, Module } from '@nestjs/common';
@@ -13,6 +14,7 @@ export class OpenAIModule {
           useValue: config,
         },
         OpenAIService,
+        AgentToolService,
       ],
       exports: [OpenAIService],
       controllers: [OpenAIController],

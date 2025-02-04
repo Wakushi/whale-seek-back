@@ -1,8 +1,6 @@
 import OpenAI from 'openai';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { AlchemyService } from '../alchemy/alchemy.service';
-import { TokensService } from '../tokens/tokens.services';
-import { BraveService } from '../brave/brave.service';
+import { AgentToolService } from './agent-tools.service';
 
 @Injectable()
 export class OpenAIService {
@@ -10,64 +8,9 @@ export class OpenAIService {
 
   private readonly logger = new Logger(OpenAIService.name);
 
-  private tools: any[] = [
-    {
-      type: 'function',
-      function: {
-        name: 'getTokenBalances',
-        description:
-          'Retrieves the ERC-20 token balances for a given wallet address.',
-        parse: JSON.parse,
-        parameters: {
-          type: 'object',
-          properties: {
-            walletAddress: {
-              type: 'string',
-            },
-          },
-        },
-        function: (wallet: any) =>
-          this.alchemyService.getTokenBalances(wallet.walletAddress),
-      },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'getTokenMarketDataById',
-        description: 'Retrieves the market data of a token based on its ID.',
-        parse: JSON.parse,
-        parameters: {
-          type: 'object',
-          properties: {
-            tokenName: { type: 'string' },
-          },
-        },
-        function: (tokenName: any) =>
-          this.tokensService.getTokenMarketDataById(tokenName.tokenName),
-      },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'search',
-        description: 'Perform an internet search',
-        parse: JSON.parse,
-        parameters: {
-          type: 'object',
-          properties: {
-            query: { type: 'string' },
-          },
-        },
-        function: (query: any) => this.braveService.search(query.query),
-      },
-    },
-  ];
-
   constructor(
     @Inject('OPENAI_CONFIG') private readonly config: { openAiApiKey: string },
-    private alchemyService: AlchemyService,
-    private tokensService: TokensService,
-    private braveService: BraveService,
+    private readonly toolService: AgentToolService,
   ) {
     this.openai = new OpenAI({
       apiKey: config.openAiApiKey,
@@ -83,7 +26,7 @@ export class OpenAIService {
       .runTools({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: userQuery }],
-        tools: this.tools,
+        tools: this.toolService.tools,
       })
       .on('message', (message: any) => this.logAgentProcess(message));
 

@@ -28,7 +28,9 @@ export class BraveService {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        this.logger.error(`HTTP error! Status: ${response.status}, Body: ${errorBody}`);
+        this.logger.error(
+          `HTTP error! Status: ${response.status}, Body: ${errorBody}`,
+        );
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
