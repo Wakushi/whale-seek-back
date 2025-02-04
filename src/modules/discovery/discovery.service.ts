@@ -4,7 +4,7 @@ import { WethTransferQuery } from '../graph/entities/graph.types';
 import { Address } from 'viem';
 import { SupabaseService } from '../supabase/supabase.service';
 import { Collection } from '../supabase/entities/collections';
-import { Whale, WhaleDetection } from './entities/discovery.type';
+import { WhaleDetection } from './entities/discovery.type';
 import { AnalysisService } from '../analysis/analysis.service';
 
 @Injectable()
@@ -18,21 +18,14 @@ export class DiscoveryService {
   ) {}
 
   public async discoverWhales(): Promise<void> {
-    // const whales = await this.findWhales();
+    const whales = await this.findWhales();
 
-    const whales = await this.supabaseService.getAll<Whale>(
-      Collection.WHALE_INFO,
-    );
-
-    // FOR TESTING PURPOSES
-    const SMALL_SAMPLE: Address[] = [
-      '0xa30965a445963ab0d016c86df1a905c2f58b379f',
-    ];
-
-    for (const whale of SMALL_SAMPLE) {
-      this.logger.log(`Analysing whale ${whale}`);
-      await this.analysisService.analyseWallet(whale);
+    for (const whale of whales) {
+      this.logger.log(`Analysing whale ${whale.address}`);
+      await this.analysisService.analyseWallet(whale.address);
     }
+
+    this.logger.log(`Completed analysis of ${whales.length} whales!`);
   }
 
   public async findWhales(): Promise<WhaleDetection[]> {

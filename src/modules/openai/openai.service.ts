@@ -49,8 +49,8 @@ export class OpenAIService {
     {
       type: 'function',
       function: {
-        name: "search",
-        description : 'internet search',
+        name: 'search',
+        description: 'Perform an internet search',
         parse: JSON.parse,
         parameters: {
           type: 'object',
@@ -58,16 +58,16 @@ export class OpenAIService {
             query: { type: 'string' },
           },
         },
-        function: (query: any) => this.braveService.search(query.query)
-      }
-    }
+        function: (query: any) => this.braveService.search(query.query),
+      },
+    },
   ];
 
   constructor(
     @Inject('OPENAI_CONFIG') private readonly config: { openAiApiKey: string },
     private alchemyService: AlchemyService,
     private tokensService: TokensService,
-    private braveService: BraveService
+    private braveService: BraveService,
   ) {
     this.openai = new OpenAI({
       apiKey: config.openAiApiKey,
@@ -100,10 +100,8 @@ export class OpenAIService {
 
     if (!isUsingTool) return;
 
-
     message.tool_calls.forEach((tool: any) => {
       let info = '';
-      console.log(tool)
 
       switch (tool.function.name) {
         case 'getTokenBalances':
