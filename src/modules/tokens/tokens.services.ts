@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as puppeteer from 'puppeteer';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -6,48 +6,109 @@ import { CsvService } from 'src/shared/services/csv.service';
 import {
   CoinCodexBaseTokenData,
   CoinCodexCsvDailyMetrics,
+  CoinCodexListToken,
   CoinCodexTokenData,
   SupplyMetrics,
+  TokenData,
 } from './entities/coin-codex.type';
 import { access } from 'fs/promises';
+import Fuse from 'fuse.js';
+import { COINGECKO_TOKEN_LIST } from './data/coingecko-list';
 
 @Injectable()
 export class TokensService {
   private readonly COINGECKO_API = 'https://api.coingecko.com/api/v3';
 
+  private readonly logger = new Logger(TokensService.name);
+
   constructor(private readonly csvService: CsvService) {}
-  /**
-   * Gets market data for a token by its name.
-   * @param tokenName - The token name (e.g. "bitcoin", "ethereum").
-   * @returns The market data (price, volume, market cap, etc.).
-   */
-  async getTokenMarketDataById(tokenName: string): Promise<any> {
+
+  async getTokenIdByName(tokenName: string): Promise<string | null> {
     try {
-      const tokenId = await this.getTokenIdByName(tokenName);
-  
-      if (!tokenId) {
-        throw new Error(`Token with name "${tokenName}" not found.`);
-      }
-  
-      const url = `${this.COINGECKO_API}/coins/${tokenId}?localization=false&tickers=true&market_data=true&community_data=true&developer_data=true&sparkline=true`;
+      const performFuseSearch = (
+        searchedName: string,
+        searchList: CoinCodexListToken[],
+      ) => {
+        const fuse = new Fuse(searchList, {
+          keys: ['name', 'symbol', 'id'],
+          includeScore: true,
+          threshold: 0.3,
+        });
+
+        const results = fuse.search(searchedName);
+
+        if (!results || !results.length) return '';
+
+        const rankedResults = results.sort((a, b) => {
+          if (a.score !== b.score) {
+            return a.score - b.score;
+          }
+          return 0;
+        });
+
+        const topResult: CoinCodexListToken = rankedResults[0].item;
+
+        return topResult.id;
+      };
+
+      const localSearchResult = performFuseSearch(
+        tokenName,
+        COINGECKO_TOKEN_LIST,
+      );
+
+      if (localSearchResult) return localSearchResult;
+
+      const url = `${this.COINGECKO_API}/coins/list`;
       const response = await fetch(url);
-  
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-  
+
+      const tokens = await response.json();
+
+      if (!tokens || !tokens.length) return '';
+
+      const externalSearchResult = performFuseSearch(tokenName, tokens);
+
+      return externalSearchResult;
+    } catch (error) {
+      console.error('Error fetching token ID by name:', error);
+      throw new Error('Failed to fetch token ID by name');
+    }
+  }
+
+  async getTokenMarketDataById(tokenName: string): Promise<TokenData | null> {
+    try {
+      let tokenId = await this.getTokenIdByName(tokenName);
+
+      if (!tokenId) {
+        console.error(`Token with name "${tokenName}" not found.`);
+        tokenId = tokenName.trim().toLowerCase();
+      }
+
+      this.logger.log(
+        `Fetching market data for token ${tokenId} (${tokenName})`,
+      );
+
+      const url = `${this.COINGECKO_API}/coins/${tokenId}?localization=false&tickers=true&market_data=true&community_data=true&developer_data=true&sparkline=true`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        console.error(`HTTP error! Status: ${response.status}`);
+        return null;
+      }
+
       const data = await response.json();
       const marketData = data.market_data;
-  
+
       return {
-        // Informations de base
         name: data.name,
         symbol: data.symbol,
         description: data.description.en,
         genesis_date: data.genesis_date,
         categories: data.categories,
-        
-        // Données de marché
+
         market_data: {
           current_price: marketData.current_price,
           market_cap: marketData.market_cap,
@@ -56,8 +117,7 @@ export class TokensService {
           circulating_supply: marketData.circulating_supply,
           total_supply: marketData.total_supply,
           max_supply: marketData.max_supply,
-          
-          // Métriques de performance
+
           price_change_percentage: {
             '1h': marketData.price_change_percentage_1h_in_currency,
             '24h': marketData.price_change_percentage_24h_in_currency,
@@ -66,8 +126,7 @@ export class TokensService {
             '30d': marketData.price_change_percentage_30d_in_currency,
             '1y': marketData.price_change_percentage_1y_in_currency,
           },
-          
-          // Données de trading
+
           high_24h: marketData.high_24h,
           low_24h: marketData.low_24h,
           ath: marketData.ath,
@@ -75,17 +134,18 @@ export class TokensService {
           atl: marketData.atl,
           atl_date: marketData.atl_date,
         },
-  
-        // Données communautaires
+
         community_data: {
           twitter_followers: data.community_data.twitter_followers,
           reddit_subscribers: data.community_data.reddit_subscribers,
-          reddit_average_posts_48h: data.community_data.reddit_average_posts_48h,
-          reddit_average_comments_48h: data.community_data.reddit_average_comments_48h,
-          telegram_channel_user_count: data.community_data.telegram_channel_user_count,
+          reddit_average_posts_48h:
+            data.community_data.reddit_average_posts_48h,
+          reddit_average_comments_48h:
+            data.community_data.reddit_average_comments_48h,
+          telegram_channel_user_count:
+            data.community_data.telegram_channel_user_count,
         },
-  
-        // Données développeurs
+
         developer_data: {
           forks: data.developer_data.forks,
           stars: data.developer_data.stars,
@@ -93,13 +153,15 @@ export class TokensService {
           total_issues: data.developer_data.total_issues,
           closed_issues: data.developer_data.closed_issues,
           pull_requests_merged: data.developer_data.pull_requests_merged,
-          pull_request_contributors: data.developer_data.pull_request_contributors,
-          code_additions_4_weeks: data.developer_data.code_additions_deletions_4_weeks?.additions,
-          code_deletions_4_weeks: data.developer_data.code_additions_deletions_4_weeks?.deletions,
+          pull_request_contributors:
+            data.developer_data.pull_request_contributors,
+          code_additions_4_weeks:
+            data.developer_data.code_additions_deletions_4_weeks?.additions,
+          code_deletions_4_weeks:
+            data.developer_data.code_additions_deletions_4_weeks?.deletions,
           commit_count_4_weeks: data.developer_data.commit_count_4_weeks,
         },
-  
-        // Liens importants
+
         links: {
           homepage: data.links?.homepage,
           blockchain_site: data.links?.blockchain_site,
@@ -110,8 +172,7 @@ export class TokensService {
           telegram_channel_identifier: data.links?.telegram_channel_identifier,
           github_repo: data.links?.repos_url?.github,
         },
-  
-        // Liquidité et exchanges
+
         tickers: data.tickers?.map((ticker: any) => ({
           exchange: ticker.market.name,
           pair: ticker.target,
@@ -119,8 +180,7 @@ export class TokensService {
           trade_url: ticker.trade_url,
           trust_score: ticker.trust_score,
         })),
-  
-        // Score de confiance
+
         coingecko_scores: {
           developer_score: data.developer_score,
           community_score: data.community_score,
@@ -130,36 +190,7 @@ export class TokensService {
       };
     } catch (error) {
       console.error('Error fetching token market data:', error);
-      throw new Error('Failed to fetch token market data');
-    }
-  }
-
-  /**
-   * Gets a token ID by its name.
-   * @param tokenName - The token name (e.g. "bitcoin", "ethereum").
-   * @returns The token ID.
-   */
-  async getTokenIdByName(tokenName: string): Promise<string | null> {
-    try {
-      const url = `${this.COINGECKO_API}/coins/list`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const tokens = await response.json();
-
-      const token = tokens.find(
-        (t: any) =>
-          t.name.toLowerCase() === tokenName.toLowerCase() ||
-          t.symbol.toLowerCase() === tokenName.toLowerCase(),
-      );
-
-      return token ? token.id : null;
-    } catch (error) {
-      console.error('Error fetching token ID by name:', error);
-      throw new Error('Failed to fetch token ID by name');
+      return null;
     }
   }
 

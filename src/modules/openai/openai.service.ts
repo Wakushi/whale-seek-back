@@ -1,6 +1,19 @@
 import OpenAI from 'openai';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AgentToolService } from './agent-tools.service';
+import { zodResponseFormat } from 'openai/helpers/zod';
+import { z } from 'zod';
+import {
+  Agent,
+  AnalystResponseFormat,
+  RouterResponseFormat,
+  GeneralResponseFormat,
+  AgentResponse,
+  AgentResponseRegistry,
+} from './entities/agent.type';
+import { ROUTER_PROMPT } from './entities/prompts/router.prompt';
+import { TOKEN_ANALYST_PROMPT } from './entities/prompts/token-analyst.prompt';
+import { GENERAL_PROMPT } from './entities/prompts/general.prompt';
 
 @Injectable()
 export class OpenAIService {
@@ -17,25 +30,88 @@ export class OpenAIService {
     });
   }
 
-  public async askAgent(userQuery: string): Promise<string> {
-    const start = Date.now();
-
+  public async askAgent(query: string, agent?: Agent): Promise<AgentResponse> {
     this.logger.log('Agent starting task..');
 
+    if (agent) {
+      const result = await this.runAgent(query, agent);
+
+      return result;
+    }
+
+    const routerAgentCompletion = await this.openai.beta.chat.completions.parse(
+      this.buildAgent(query, Agent.ROUTER),
+    );
+
+    const routerResponse = this.parseAnswer<
+      z.infer<typeof RouterResponseFormat>
+    >(routerAgentCompletion);
+
+    this.logger.log(`Routing query to ${routerResponse.agent} agent...`);
+
+    const result = await this.runAgent(query, routerResponse.agent);
+
+    return result;
+  }
+
+  private async runAgent(userQuery: string, agent: Agent): Promise<any> {
     const runner = this.openai.beta.chat.completions
-      .runTools({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: userQuery }],
-        tools: this.toolService.tools,
-      })
+      .runTools(this.buildAgent(userQuery, agent))
       .on('message', (message: any) => this.logAgentProcess(message));
 
-    const finalContent = await runner.finalContent();
+    const rawContent = await runner.finalContent();
 
-    const duration = Date.now() - start;
-    this.logger.log(`Agent completed task! (${duration}ms)`);
+    const responseSchema = AgentResponseRegistry[agent];
+    const parsedResponse = responseSchema.parse(JSON.parse(rawContent));
 
-    return finalContent;
+    return parsedResponse;
+  }
+
+  private buildAgent(query: string, agentType: Agent): any {
+    const GENERAL_AGENT = {
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: GENERAL_PROMPT,
+        },
+        { role: 'user', content: query },
+      ],
+      tools: this.toolService.getAgentTools(Agent.GENERAL),
+      response_format: zodResponseFormat(GeneralResponseFormat, 'event'),
+    };
+
+    switch (agentType) {
+      case Agent.ROUTER:
+        return {
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: ROUTER_PROMPT,
+            },
+            { role: 'user', content: query },
+          ],
+          response_format: zodResponseFormat(RouterResponseFormat, 'event'),
+        };
+      case Agent.GENERAL:
+        return GENERAL_AGENT;
+      case Agent.TOKEN_ANALYST:
+        return {
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: TOKEN_ANALYST_PROMPT,
+            },
+            { role: 'user', content: query },
+          ],
+          tools: this.toolService.getAgentTools(Agent.TOKEN_ANALYST),
+          response_format: zodResponseFormat(AnalystResponseFormat, 'event'),
+        };
+      default:
+        return GENERAL_AGENT;
+    }
   }
 
   private logAgentProcess(message: any): void {
@@ -61,5 +137,13 @@ export class OpenAIService {
 
       this.logger.log(info);
     });
+  }
+
+  private parseAnswer<T>(completion: any): T {
+    try {
+      return JSON.parse(completion.choices[0].message.content) as T;
+    } catch (error) {
+      throw new Error('Failed to parse agent response');
+    }
   }
 }
