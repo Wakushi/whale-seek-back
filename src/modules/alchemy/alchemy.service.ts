@@ -33,13 +33,15 @@ export class AlchemyService {
     return this._client;
   }
 
-  /**
-   * Gets and formats token balances for an address.
-   * @param walletAddress - The wallet address.
-   * @returns The formatted token balances.
-   */
   public async getTokenBalances(walletAddress: Address): Promise<Wallet> {
     try {
+      const ethBalanceHex = await this.client.core.getBalance(walletAddress);
+      const ethBalanceHexString = ethBalanceHex.toHexString();
+      const ethBalance = hexToDecimal(ethBalanceHexString, 18);
+
+      const ethPrice = await this.getTokenPriceInUSD('ETH');
+      const ethValueInUSD = ethBalance * ethPrice;
+
       const balances = await this.client.core.getTokenBalances(walletAddress);
 
       const nonZeroBalances = balances.tokenBalances.filter((token) => {
@@ -73,9 +75,20 @@ export class AlchemyService {
         }),
       );
 
+      const allBalances = [
+        {
+          contractAddress: null,
+          name: 'Ethereum',
+          symbol: 'ETH',
+          balance: ethBalance.toFixed(4),
+          valueInUSD: ethValueInUSD.toFixed(2),
+        },
+        ...formattedBalances,
+      ];
+
       return {
         address: walletAddress,
-        tokens: formattedBalances,
+        tokens: allBalances,
       };
     } catch (error) {
       console.error('Error fetching token balances:', error);
@@ -83,11 +96,6 @@ export class AlchemyService {
     }
   }
 
-  /**
-   * Gets a token's metadata (name, symbol, decimals).
-   * @param contractAddress - The token's contract address.
-   * @returns The token's metadata.
-   */
   public async getTokenMetadata(contractAddress: Address): Promise<{
     name: string;
     symbol: string;
