@@ -19,6 +19,7 @@ export class AgentToolService {
         description:
           'Retrieves the ERC-20 token balances for a given wallet address.',
         parse: JSON.parse,
+        strict: true,
         parameters: {
           type: 'object',
           properties: {
@@ -26,6 +27,8 @@ export class AgentToolService {
               type: 'string',
             },
           },
+          required: ['walletAddress'],
+          additionalProperties: false,
         },
         function: (wallet: any) =>
           this.alchemyService.getTokenBalances(wallet.walletAddress),
@@ -37,11 +40,14 @@ export class AgentToolService {
         name: 'getTokenMarketDataById',
         description: 'Retrieves the market data of a token based on its ID.',
         parse: JSON.parse,
+        strict: true,
         parameters: {
           type: 'object',
           properties: {
             tokenName: { type: 'string' },
           },
+          required: ['tokenName'],
+          additionalProperties: false,
         },
         function: (tokenName: any) =>
           this.tokensService.getTokenMarketDataById(tokenName.tokenName),
@@ -53,11 +59,14 @@ export class AgentToolService {
         name: 'search',
         description: 'Perform an internet search',
         parse: JSON.parse,
+        strict: true,
         parameters: {
           type: 'object',
           properties: {
             query: { type: 'string' },
           },
+          required: ['query'],
+          additionalProperties: false,
         },
         function: (query: any) => this.braveService.search(query.query),
       },
