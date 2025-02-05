@@ -9,13 +9,18 @@ import { ISwapRouter } from "@uniswap/v3-periphery/contracts/interfaces/ISwapRou
 import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-// Ethereum Sepolia 0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E
-// Base Mainnet 0x2626664c2603336E57B271c5C0b26F421741e481
+/**
+ * ==================== Contract Addresses ====================
+ * 
+ * Network          | Contract | Address
+ * -----------------|----------|----------------------------------
+ * Base Mainnet     | Factory  | 0x33128a8fC17869897dcE68Ed026d694621f6FDfD
+ *                  | Router   | 0x2626664c2603336E57B271c5C0b26F421741e481
+ *                  | USDC     | 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+ *                  | WETH     | 0x4200000000000000000000000000000000000006
+ */
 
-// USDC (Ethereum Sepolia) 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
-// WETH (Ethereum Sepolia) 0xfff9976782d46cc05630d1f6ebab18b2324d6b14
-
-contract WhaleSeek is Ownable {
+contract WhaleSeekWallet is Ownable {
     using SafeERC20 for IERC20;
 
     struct Swap {
@@ -29,8 +34,8 @@ contract WhaleSeek is Ownable {
     uint256 private swapCount;
     mapping(uint256 swapId => Swap) private s_swaps;
 
-    IUniswapV3Factory private constant i_uniswapFactory = IUniswapV3Factory(0x0227628f3F023bb0B980b67D528571c95c6DaC1c);
-    ISwapRouter02 private constant router = ISwapRouter02(0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E);
+    IUniswapV3Factory private constant i_uniswapFactory = IUniswapV3Factory(0x33128a8fC17869897dcE68Ed026d694621f6FDfD);
+    ISwapRouter02 private constant router = ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
 
     error WhaleSeek__NotAgent();
     error WhaleSeek__TransferFailed();
@@ -179,4 +184,24 @@ interface ISwapRouter02 {
         external
         payable
         returns (uint256 amountOut);
+
+    struct ExactOutputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        address recipient;
+        uint256 amountOut;
+        uint256 amountInMaximum;
+        uint160 sqrtPriceLimitX96;
+    }
+
+    function exactOutputSingle(ExactOutputSingleParams calldata params)
+        external
+        payable
+        returns (uint256 amountIn);
+}
+
+interface IWETH is IERC20 {
+    function deposit() external payable;
+    function withdraw(uint256 amount) external;
 }
