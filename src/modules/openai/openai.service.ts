@@ -3,33 +3,17 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AgentToolService } from './agent-tools.service';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
-
-enum Agent {
-  GENERAL = 'GENERAL',
-  TOKEN_ANALYST = 'TOKEN_ANALYST',
-  ROUTER = 'ROUTER',
-}
-
-const routerResponseFormat = z.object({
-  agent: z.enum([Agent.TOKEN_ANALYST, Agent.GENERAL]),
-  query: z.string(),
-});
-
-const analystResponseFormat = z.object({
-  analysis: z.string(),
-  confidence: z.number(),
-  metrics: z.array(
-    z.object({
-      name: z.string(),
-      value: z.number(),
-    }),
-  ),
-});
-
-const generalResponseFormat = z.object({
-  answer: z.string(),
-  suggestions: z.array(z.string()),
-});
+import {
+  Agent,
+  AnalystResponseFormat,
+  RouterResponseFormat,
+  GeneralResponseFormat,
+  AgentResponse,
+  AgentResponseRegistry,
+} from './entities/agent.type';
+import { ROUTER_PROMPT } from './entities/prompts/router.prompt';
+import { TOKEN_ANALYST_PROMPT } from './entities/prompts/token-analyst.prompt';
+import { GENERAL_PROMPT } from './entities/prompts/general.prompt';
 
 @Injectable()
 export class OpenAIService {
@@ -46,137 +30,49 @@ export class OpenAIService {
     });
   }
 
-  public async askAgent(userQuery: string): Promise<string> {
+  public async askAgent(userQuery: string): Promise<AgentResponse> {
     const start = Date.now();
+
     this.logger.log('Agent starting task..');
 
-    try {
-      const routerAgent = this.buildGeneralAgent(userQuery, Agent.ROUTER);
-      this.logger.debug('Router agent config:', routerAgent);
+    const routerAgentCompletion = await this.openai.beta.chat.completions.parse(
+      this.buildAgent(userQuery, Agent.ROUTER),
+    );
 
-      const routerAgentRunner =
-        await this.openai.beta.chat.completions.parse(routerAgent);
-      this.logger.debug('Router response:', routerAgentRunner);
+    const routerResponse = this.parseAnswer<
+      z.infer<typeof RouterResponseFormat>
+    >(routerAgentCompletion);
 
-      const assignment = routerAgentRunner.choices[0].message.parsed as z.infer<
-        typeof routerResponseFormat
-      >;
-      this.logger.debug('Assigned agent:', assignment);
+    this.logger.log(`Routing query to ${routerResponse.agent} agent...`);
 
-      const agent = this.buildGeneralAgent(userQuery, assignment.agent);
-      this.logger.debug('Final agent config:', agent);
+    const runner = this.openai.beta.chat.completions
+      .runTools(this.buildAgent(userQuery, routerResponse.agent))
+      .on('message', (message: any) => this.logAgentProcess(message));
 
-      const runner = await this.openai.beta.chat.completions.parse(agent);
-      this.logger.debug('Final agent response:', runner);
+    const rawContent = await runner.finalContent();
 
-      if (runner.choices[0].message.tool_calls?.length > 0) {
-        this.logger.debug('Processing tool calls...');
+    const responseSchema = AgentResponseRegistry[routerResponse.agent];
+    const parsedResponse = responseSchema.parse(JSON.parse(rawContent));
 
-        const toolResults = await Promise.all(
-          runner.choices[0].message.tool_calls.map(async (toolCall) => {
-            const { name, parsed_arguments } = toolCall.function;
+    this.logger.log(`Agent completed task! (${Date.now() - start}ms)`);
 
-            this.logger.debug(
-              `Executing tool ${name} with args:`,
-              parsed_arguments,
-            );
-
-            const tool = this.toolService.tools.find(
-              (t) => t.function.name === name,
-            );
-            if (!tool) {
-              throw new Error(`Tool ${name} not found`);
-            }
-
-            const result = await tool.function.function(parsed_arguments);
-
-            return {
-              tool_call_id: toolCall.id,
-              role: 'tool',
-              name: name,
-              content: JSON.stringify(result),
-            };
-          }),
-        );
-
-        this.logger.debug('Calling agent with tool results');
-        const messages = [
-          ...agent.messages,
-          runner.choices[0].message,
-          ...toolResults,
-        ];
-
-        const finalResponse = await this.openai.beta.chat.completions.parse({
-          model: 'gpt-4o-2024-08-06',
-          messages,
-          response_format: { type: 'json_object' },
-          ...(assignment.agent === Agent.TOKEN_ANALYST
-            ? {
-                response_format: zodResponseFormat(
-                  analystResponseFormat,
-                  'event',
-                ),
-              }
-            : {
-                response_format: zodResponseFormat(
-                  generalResponseFormat,
-                  'event',
-                ),
-              }),
-        });
-
-        const finalContent = finalResponse.choices[0].message.parsed;
-        this.logger.debug('Final content after tool calls:', finalContent);
-
-        if (!finalContent) {
-          throw new Error('No content received from OpenAI after tool calls');
-        }
-
-        if (assignment.agent === Agent.TOKEN_ANALYST) {
-          const content = finalContent as z.infer<typeof analystResponseFormat>;
-          if (!content.analysis) {
-            throw new Error('No analysis received from token analyst');
-          }
-          return content.analysis;
-        } else {
-          const content = finalContent as z.infer<typeof generalResponseFormat>;
-          if (!content.answer) {
-            throw new Error('No answer received from general agent');
-          }
-          return content.answer;
-        }
-      }
-
-      const finalContent = runner.choices[0].message.parsed;
-      this.logger.debug('Final content:', finalContent);
-
-      if (!finalContent) {
-        throw new Error('No content received from OpenAI');
-      }
-
-      const duration = Date.now() - start;
-      this.logger.log(`Agent completed task! (${duration}ms)`);
-
-      if (assignment.agent === Agent.TOKEN_ANALYST) {
-        const content = finalContent as z.infer<typeof analystResponseFormat>;
-        if (!content.analysis) {
-          throw new Error('No analysis received from token analyst');
-        }
-        return content.analysis;
-      } else {
-        const content = finalContent as z.infer<typeof generalResponseFormat>;
-        if (!content.answer) {
-          throw new Error('No answer received from general agent');
-        }
-        return content.answer;
-      }
-    } catch (error) {
-      this.logger.error('Error in askAgent:', error);
-      throw error;
-    }
+    return parsedResponse;
   }
 
-  private buildGeneralAgent(query: string, agentType: Agent): any {
+  private buildAgent(query: string, agentType: Agent): any {
+    const GENERAL_AGENT = {
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: GENERAL_PROMPT,
+        },
+        { role: 'user', content: query },
+      ],
+      tools: this.toolService.getAgentTools(Agent.GENERAL),
+      response_format: zodResponseFormat(GeneralResponseFormat, 'event'),
+    };
+
     switch (agentType) {
       case Agent.ROUTER:
         return {
@@ -184,61 +80,32 @@ export class OpenAIService {
           messages: [
             {
               role: 'system',
-              content: `You are a router agent. Your task is to analyze the user query and decide which agent should handle it:
-            - Use ANALYST for queries about token analyse with getTokenMarketDataById
-            - Use GENERAL for general questions and tasks, 
-            Return your choice in JSON format with "agent" and "query" fields.`,
+              content: ROUTER_PROMPT,
             },
             { role: 'user', content: query },
           ],
-          response_format: zodResponseFormat(routerResponseFormat, 'event'),
+          response_format: zodResponseFormat(RouterResponseFormat, 'event'),
         };
       case Agent.GENERAL:
-        return {
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content:`You are a general purpose agent with web search capabilities.
-            Use the search function to find relevant information when needed.
-            Provide clear answers and relevant suggestions.` },
-            { role: 'user', content: query },
-          ],
-          tools: [
-            this.toolService.tools.find(
-              (t) => t.function.name === 'getTokenBalances',
-            ),
-            this.toolService.tools.find((t) => t.function.name === 'search'),
-          ],
-        };
+        return GENERAL_AGENT;
       case Agent.TOKEN_ANALYST:
         return {
           model: 'gpt-4o',
           messages: [
             {
               role: 'system',
-              content: `You are an analyst agent specialized in token analysis. 
-            Provide detailed analysis with confidence scores and relevant metrics.`,
+              content: TOKEN_ANALYST_PROMPT,
             },
             { role: 'user', content: query },
           ],
-          tools: [
-            this.toolService.tools.find(
-              (t) => t.function.name === 'getTokenMarketDataById',
-            ),
-          ],
-          response_format: zodResponseFormat(analystResponseFormat, 'event'),
+          tools: this.toolService.getAgentTools(Agent.TOKEN_ANALYST),
+          response_format: zodResponseFormat(AnalystResponseFormat, 'event'),
         };
       default:
-        return {
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: '' },
-            { role: 'user', content: query },
-          ],
-          tools: this.toolService.tools,
-          response_format: zodResponseFormat(generalResponseFormat, 'event'),
-        };
+        return GENERAL_AGENT;
     }
   }
+
   private logAgentProcess(message: any): void {
     const isUsingTool = !!message.tool_calls?.length;
 
@@ -262,5 +129,13 @@ export class OpenAIService {
 
       this.logger.log(info);
     });
+  }
+
+  private parseAnswer<T>(completion: any): T {
+    try {
+      return JSON.parse(completion.choices[0].message.content) as T;
+    } catch (error) {
+      throw new Error('Failed to parse agent response');
+    }
   }
 }
