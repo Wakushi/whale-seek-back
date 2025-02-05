@@ -9,9 +9,11 @@ import {
   CoinCodexListToken,
   CoinCodexTokenData,
   SupplyMetrics,
-  TokenData
+  TokenData,
 } from './entities/coin-codex.type';
 import { access } from 'fs/promises';
+import Fuse from 'fuse.js';
+import { COINGECKO_TOKEN_LIST } from './data/coingecko-list';
 
 @Injectable()
 export class TokensService {
@@ -21,13 +23,68 @@ export class TokensService {
 
   constructor(private readonly csvService: CsvService) {}
 
+  async getTokenIdByName(tokenName: string): Promise<string | null> {
+    try {
+      const performFuseSearch = (
+        searchedName: string,
+        searchList: CoinCodexListToken[],
+      ) => {
+        const fuse = new Fuse(searchList, {
+          keys: ['name', 'symbol', 'id'],
+          includeScore: true,
+          threshold: 0.3,
+        });
+
+        const results = fuse.search(searchedName);
+
+        if (!results || !results.length) return '';
+
+        const rankedResults = results.sort((a, b) => {
+          if (a.score !== b.score) {
+            return a.score - b.score;
+          }
+          return 0;
+        });
+
+        const topResult: CoinCodexListToken = rankedResults[0].item;
+
+        return topResult.id;
+      };
+
+      const localSearchResult = performFuseSearch(
+        tokenName,
+        COINGECKO_TOKEN_LIST,
+      );
+
+      if (localSearchResult) return localSearchResult;
+
+      const url = `${this.COINGECKO_API}/coins/list`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const tokens = await response.json();
+
+      if (!tokens || !tokens.length) return '';
+
+      const externalSearchResult = performFuseSearch(tokenName, tokens);
+
+      return externalSearchResult;
+    } catch (error) {
+      console.error('Error fetching token ID by name:', error);
+      throw new Error('Failed to fetch token ID by name');
+    }
+  }
+
   async getTokenMarketDataById(tokenName: string): Promise<TokenData | null> {
     try {
-      const tokenId = await this.getTokenIdByName(tokenName);
+      let tokenId = await this.getTokenIdByName(tokenName);
 
       if (!tokenId) {
         console.error(`Token with name "${tokenName}" not found.`);
-        return null;
+        tokenId = tokenName.trim().toLowerCase();
       }
 
       this.logger.log(
@@ -135,83 +192,6 @@ export class TokensService {
       console.error('Error fetching token market data:', error);
       return null;
     }
-  }
-
-  public async getTokenIdByName(tokenName: string): Promise<string | null> {
-    try {
-      const url = `${this.COINGECKO_API}/coins/list`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const tokens = await response.json();
-
-      const matches = this.findTokenMatches(tokens, tokenName);
-
-      if (matches.length === 0) {
-        return null;
-      }
-
-      if (matches.length > 1) {
-        const token = await this.getMostPopularToken(matches);
-
-        if (token) return token.id;
-      }
-
-      return matches[0] ? matches[0].id : null;
-    } catch (error) {
-      console.error('Error fetching token ID by name:', error);
-      throw new Error('Failed to fetch token ID by name');
-    }
-  }
-
-  public findTokenMatches(
-    tokens: CoinCodexListToken[],
-    searchTerm: string,
-  ): CoinCodexListToken[] {
-    const normalizedSearch = searchTerm.toLowerCase().trim();
-
-    const perfectMatches: CoinCodexListToken[] = [];
-    const exactSymbolMatches: CoinCodexListToken[] = [];
-    const exactNameMatches: CoinCodexListToken[] = [];
-    const startsWith: CoinCodexListToken[] = [];
-
-    tokens.forEach((token) => {
-      const normalizedName = token.name.toLowerCase();
-      const normalizedSymbol = token.symbol.toLowerCase();
-
-      if (
-        normalizedName === normalizedSearch &&
-        normalizedSymbol === normalizedSearch
-      ) {
-        perfectMatches.push(token);
-      } else if (normalizedSymbol === normalizedSearch) {
-        exactSymbolMatches.push(token);
-      } else if (normalizedName === normalizedSearch) {
-        exactNameMatches.push(token);
-      } else if (
-        normalizedSymbol.startsWith(normalizedSearch) ||
-        normalizedName.startsWith(normalizedSearch)
-      ) {
-        startsWith.push(token);
-      }
-    });
-
-    if (perfectMatches.length > 0) {
-      return perfectMatches;
-    }
-
-    if (exactSymbolMatches.length > 0) {
-      return exactSymbolMatches;
-    }
-
-    if (exactNameMatches.length > 0) {
-      return exactNameMatches;
-    }
-
-    return startsWith.slice(0, 3);
   }
 
   public async fetchDailyMetrics(
@@ -405,39 +385,6 @@ export class TokensService {
       return false;
     } finally {
       await browser.close();
-    }
-  }
-
-  private async getMostPopularToken(
-    tokens: CoinCodexListToken[],
-  ): Promise<CoinCodexListToken> {
-    try {
-      const marketDataPromises = tokens.map((token) =>
-        fetch(`${this.COINGECKO_API}/coins/${token.id}`)
-          .then((response) => response.json())
-          .catch(() => null),
-      );
-
-      const marketData = await Promise.all(marketDataPromises);
-
-      const rankedTokens = tokens.map((token, index) => ({
-        ...token,
-        market_cap: marketData[index]?.market_data?.market_cap?.usd || 0,
-        total_volume: marketData[index]?.market_data?.total_volume?.usd || 0,
-      }));
-
-      rankedTokens.sort((a, b) => {
-        if (a.market_cap === b.market_cap) {
-          return (b.total_volume || 0) - (a.total_volume || 0);
-        }
-
-        return (b.market_cap || 0) - (a.market_cap || 0);
-      });
-
-      return rankedTokens[0];
-    } catch (error) {
-      console.error('Error ranking tokens:', error);
-      return tokens[0];
     }
   }
 

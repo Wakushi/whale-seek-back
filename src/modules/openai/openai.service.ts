@@ -30,13 +30,17 @@ export class OpenAIService {
     });
   }
 
-  public async askAgent(userQuery: string): Promise<AgentResponse> {
-    const start = Date.now();
-
+  public async askAgent(query: string, agent?: Agent): Promise<AgentResponse> {
     this.logger.log('Agent starting task..');
 
+    if (agent) {
+      const result = await this.runAgent(query, agent);
+
+      return result;
+    }
+
     const routerAgentCompletion = await this.openai.beta.chat.completions.parse(
-      this.buildAgent(userQuery, Agent.ROUTER),
+      this.buildAgent(query, Agent.ROUTER),
     );
 
     const routerResponse = this.parseAnswer<
@@ -45,16 +49,20 @@ export class OpenAIService {
 
     this.logger.log(`Routing query to ${routerResponse.agent} agent...`);
 
+    const result = await this.runAgent(query, routerResponse.agent);
+
+    return result;
+  }
+
+  private async runAgent(userQuery: string, agent: Agent): Promise<any> {
     const runner = this.openai.beta.chat.completions
-      .runTools(this.buildAgent(userQuery, routerResponse.agent))
+      .runTools(this.buildAgent(userQuery, agent))
       .on('message', (message: any) => this.logAgentProcess(message));
 
     const rawContent = await runner.finalContent();
 
-    const responseSchema = AgentResponseRegistry[routerResponse.agent];
+    const responseSchema = AgentResponseRegistry[agent];
     const parsedResponse = responseSchema.parse(JSON.parse(rawContent));
-
-    this.logger.log(`Agent completed task! (${Date.now() - start}ms)`);
 
     return parsedResponse;
   }

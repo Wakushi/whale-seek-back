@@ -14,7 +14,7 @@ export const RouterResponseFormat = z.object({
 
 export const AnalystResponseFormat = z.object({
   type: z.literal(Agent.TOKEN_ANALYST),
-  analysis: z.string(),
+  answer: z.string(),
   confidence: z.number(),
   metrics: z.array(
     z.object({
