@@ -13,7 +13,7 @@ import {
 } from './entities/coin-codex.type';
 import { access } from 'fs/promises';
 import Fuse from 'fuse.js';
-import { COINGECKO_TOKEN_LIST } from './data/coingecko-list';
+import { TransferToken } from '../analysis/entities/analysis.type';
 
 @Injectable()
 export class TokensService {
@@ -23,40 +23,64 @@ export class TokensService {
 
   constructor(private readonly csvService: CsvService) {}
 
-  async getTokenIdByName(tokenName: string): Promise<string | null> {
+  async getCoinGeckoTokenIdByName(tokenName: string): Promise<string | null> {
     try {
-      const performFuseSearch = (
+      const performWeightedSearch = (
         searchedName: string,
-        searchList: CoinCodexListToken[],
-      ) => {
+        searchList: Array<CoinCodexBaseTokenData | CoinCodexListToken>,
+        isExternalList = false,
+      ): { id: string; score: number; marketCapRank?: number } | null => {
         const fuse = new Fuse(searchList, {
-          keys: ['name', 'symbol', 'id'],
+          keys: ['name', 'symbol'],
           includeScore: true,
-          threshold: 0.3,
+          threshold: 0.4,
+          findAllMatches: true,
         });
 
         const results = fuse.search(searchedName);
+        if (!results.length) return null;
 
-        if (!results || !results.length) return '';
+        const rankedResults = results
+          .map((result) => {
+            const item = result.item as
+              | CoinCodexBaseTokenData
+              | CoinCodexListToken;
+            const fuzzyScore = 1 - (result.score || 0);
 
-        const rankedResults = results.sort((a, b) => {
-          if (a.score !== b.score) {
-            return a.score - b.score;
-          }
-          return 0;
-        });
+            const marketCapRank = isExternalList
+              ? (item as CoinCodexBaseTokenData).market_cap_rank
+              : null;
 
-        const topResult: CoinCodexListToken = rankedResults[0].item;
+            const weightedScore = marketCapRank
+              ? fuzzyScore * 0.7 +
+                ((1000 - Math.min(marketCapRank, 1000)) / 1000) * 0.3
+              : fuzzyScore;
 
-        return topResult.id;
+            return {
+              id: isExternalList
+                ? (item as CoinCodexBaseTokenData).ccu_slug
+                : (item as CoinCodexListToken).id,
+              score: weightedScore,
+              marketCapRank,
+            };
+          })
+          .sort((a, b) => b.score - a.score);
+
+        return rankedResults[0];
       };
 
-      const localSearchResult = performFuseSearch(
-        tokenName,
-        COINGECKO_TOKEN_LIST,
-      );
+      const externalTokenList = await this.getCoinCodexCoinList();
 
-      if (localSearchResult) return localSearchResult;
+      if (externalTokenList.length) {
+        const externalResult = performWeightedSearch(
+          tokenName,
+          externalTokenList,
+          true,
+        );
+        if (externalResult && externalResult.score > 0.6) {
+          return externalResult.id;
+        }
+      }
 
       const url = `${this.COINGECKO_API}/coins/list`;
       const response = await fetch(url);
@@ -65,13 +89,13 @@ export class TokensService {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const tokens = await response.json();
+      const tokens: CoinCodexListToken[] = await response.json();
+      if (!tokens?.length) return null;
 
-      if (!tokens || !tokens.length) return '';
+      const geckoResult = performWeightedSearch(tokenName, tokens);
+      if (!geckoResult) return null;
 
-      const externalSearchResult = performFuseSearch(tokenName, tokens);
-
-      return externalSearchResult;
+      return geckoResult.id;
     } catch (error) {
       console.error('Error fetching token ID by name:', error);
       throw new Error('Failed to fetch token ID by name');
@@ -80,16 +104,12 @@ export class TokensService {
 
   async getTokenMarketDataById(tokenName: string): Promise<TokenData | null> {
     try {
-      let tokenId = await this.getTokenIdByName(tokenName);
+      let tokenId = await this.getCoinGeckoTokenIdByName(tokenName);
 
       if (!tokenId) {
         console.error(`Token with name "${tokenName}" not found.`);
         tokenId = tokenName.trim().toLowerCase();
       }
-
-      this.logger.log(
-        `Fetching market data for token ${tokenId} (${tokenName})`,
-      );
 
       const url = `${this.COINGECKO_API}/coins/${tokenId}?localization=false&tickers=true&market_data=true&community_data=true&developer_data=true&sparkline=true`;
       const response = await fetch(url);
@@ -388,6 +408,53 @@ export class TokensService {
     }
   }
 
+  public async getTokenPrice(tokenName: string): Promise<number> {
+    const coinCodexList = await this.getCoinCodexCoinList();
+
+    const performWeightedSearch = (
+      searchedName: string,
+      searchList: CoinCodexBaseTokenData[],
+    ): number => {
+      const fuse = new Fuse(searchList, {
+        keys: ['name', 'symbol'],
+        includeScore: true,
+        threshold: 0.4,
+        findAllMatches: true,
+      });
+
+      const results = fuse.search(searchedName);
+
+      if (!results.length) return null;
+
+      const rankedResults = results
+        .map((result) => {
+          const item = result.item as CoinCodexBaseTokenData;
+
+          const fuzzyScore = 1 - (result.score || 0);
+
+          const marketCapRank = item.market_cap_rank;
+
+          const weightedScore = marketCapRank
+            ? fuzzyScore * 0.7 +
+              ((1000 - Math.min(marketCapRank, 1000)) / 1000) * 0.3
+            : fuzzyScore;
+
+          return {
+            price: item.last_price_usd,
+            score: weightedScore,
+            marketCapRank,
+          };
+        })
+        .sort((a, b) => b.score - a.score);
+
+      return rankedResults[0].price;
+    };
+
+    const tokenPrice = performWeightedSearch(tokenName, coinCodexList);
+
+    return tokenPrice;
+  }
+
   public async getCoinCodexCoinList(): Promise<CoinCodexBaseTokenData[]> {
     const url = 'https://coincodex.com/apps/coincodex/cache/all_coins.json';
 
@@ -401,5 +468,35 @@ export class TokensService {
       console.error('Error fetching coin codex list: ', error);
       return [];
     }
+  }
+
+  public async getTokenDailyMetrics(
+    token: TransferToken,
+    symbol: string,
+  ): Promise<CoinCodexCsvDailyMetrics[]> {
+    if (!token || !symbol) return [];
+
+    const staticSupplyMetrics: SupplyMetrics | null =
+      await this.fetchSupplyMetrics(symbol.toLowerCase());
+
+    let dailyMetrics: CoinCodexCsvDailyMetrics[] = [];
+
+    try {
+      if (staticSupplyMetrics) {
+        dailyMetrics = await this.fetchDailyMetrics(staticSupplyMetrics.name);
+      }
+    } catch (error) {
+      dailyMetrics = await this.fetchDailyMetrics(symbol.toLowerCase());
+    }
+
+    if (!dailyMetrics.length) {
+      return [];
+    }
+
+    dailyMetrics.sort(
+      (a, b) => new Date(a.Start).getTime() - new Date(b.Start).getTime(),
+    );
+
+    return dailyMetrics;
   }
 }

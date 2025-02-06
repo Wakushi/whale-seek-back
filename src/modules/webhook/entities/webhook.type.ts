@@ -11,7 +11,7 @@ interface AddressActivityEvent {
   activity: Activity[];
 }
 
-interface Activity {
+export interface Activity {
   blockNum: string;
   hash: string;
   fromAddress: string;

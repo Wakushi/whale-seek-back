@@ -2,19 +2,35 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ViemWalletProvider, customActionProvider } from '@coinbase/agentkit';
 import {
   Address,
+  decodeFunctionResult,
   encodeFunctionData,
+  encodePacked,
   parseEther,
+  parseUnits,
   TransactionRequest,
 } from 'viem';
 import {
-  BASE_SEPOLIA_FACTORY_ABI,
+  FACTORY_ABI,
   BASE_SEPOLIA_FACTORY_ADDRESS,
+  BASE_SEPOLIA_WALLET_ABI,
 } from 'src/utils/constants/contract';
 import { z } from 'zod';
 import { TokensService } from '../tokens/tokens.services';
 import { BraveService } from '../brave/brave.service';
 import { AlchemyService } from '../alchemy/alchemy.service';
 import { Network } from 'alchemy-sdk';
+import { Agent } from './entities/agent.type';
+import { QUOTER_V2_ABI, QUOTER_V2_ADDRESS } from 'src/utils/constants/uniswap';
+
+const TransactionAnalystResponseFormatter = z.object({
+  analysis: z.string(),
+  score: z.number(),
+});
+
+const GeneralResponseFormatter = z.object({
+  answer: z.string(),
+  suggestions: z.number(),
+});
 
 @Injectable()
 export class AgentToolService {
@@ -26,15 +42,47 @@ export class AgentToolService {
     private readonly alchemyService: AlchemyService,
   ) {}
 
-  public get tools(): any[] {
-    return [
-      this.deployTradingWallet,
-      this.convertEthToWei,
-      this.getTokenMarketDataById,
-      this.getTokenBalances,
-      this.searchWeb,
-      this.getOwnerTradingWallets,
-    ];
+  public getAgentTools(agent: Agent = Agent.GENERAL): any[] {
+    switch (agent) {
+      case Agent.GENERAL:
+        return [
+          this.deployTradingWallet,
+          this.convertEthToWei,
+          this.getTokenMarketDataById,
+          this.getTokenBalances,
+          this.searchWeb,
+          this.getOwnerTradingWallets,
+        ];
+      case Agent.TRANSACTION_ANALYST:
+        return [
+          this.getTokenMarketDataByContract,
+          this.convertEthToWei,
+          this.getTokenBalances,
+          this.searchWeb,
+        ];
+      case Agent.TRADING:
+        return [this.swapTokens, this.getTokenBalances];
+      default:
+        return [
+          this.deployTradingWallet,
+          this.convertEthToWei,
+          this.getTokenMarketDataById,
+          this.getTokenBalances,
+          this.searchWeb,
+          this.getOwnerTradingWallets,
+        ];
+    }
+  }
+
+  public getAgentFormatting(agent: Agent = Agent.GENERAL): any {
+    switch (agent) {
+      case Agent.GENERAL:
+        return GeneralResponseFormatter;
+      case Agent.TRANSACTION_ANALYST:
+        return TransactionAnalystResponseFormatter;
+      default:
+        return GeneralResponseFormatter;
+    }
   }
 
   private deployTradingWallet = customActionProvider<ViemWalletProvider>({
@@ -54,9 +102,75 @@ export class AgentToolService {
       const transaction: TransactionRequest = {
         to: BASE_SEPOLIA_FACTORY_ADDRESS,
         data: encodeFunctionData({
-          abi: BASE_SEPOLIA_FACTORY_ABI,
+          abi: FACTORY_ABI,
           functionName: 'deployWallet',
           args: [account, agentAddress],
+        }),
+      };
+
+      const hash = await walletProvider.sendTransaction(transaction);
+
+      return `Transaction hash: ${hash}`;
+    },
+  });
+
+  private swapTokens = customActionProvider<ViemWalletProvider>({
+    name: 'swap_tokens',
+    description: `Executes a token swap using Uniswap V3 through a trading wallet. 
+      Automatically calculates the minimum output amount with a 0.5% slippage tolerance.
+      The swap is executed using a single-hop path with a 0.3% fee tier.
+      
+      Required parameters:
+      - wallet: The trading wallet address that will execute the swap
+      - tokenIn: The address of the token to swap from
+      - tokenOut: The address of the token to swap to
+      - amountIn: The amount of input tokens to swap (in wei)
+      
+      Returns the transaction hash of the executed swap.
+      
+      Note: Ensures price protection by fetching real-time quotes from Uniswap's on-chain Quoter V2 contract.`,
+    schema: z.object({
+      wallet: z
+        .string()
+        .describe('Trading wallet address that will execute the swap'),
+      tokenIn: z.string().describe('Address of the token to swap from'),
+      tokenOut: z.string().describe('Address of the token to swap to'),
+      amountIn: z.string().describe('Amount of input tokens to swap (in wei)'),
+    }),
+    invoke: async (walletProvider, args: any) => {
+      const { wallet, tokenIn, tokenOut, amountIn } = args;
+
+      this.logger.log(`Swapping tokens for ${wallet} wallet...`);
+
+      const getQuote = async () => {
+        try {
+          const path = encodePacked(
+            ['address', 'uint24', 'address'],
+            [tokenIn, 3000, tokenOut],
+          );
+
+          const amountOut: any = await walletProvider.readContract({
+            address: QUOTER_V2_ADDRESS,
+            abi: QUOTER_V2_ABI,
+            functionName: 'quoteExactInput',
+            args: [path, amountIn],
+          });
+
+          return (BigInt(amountOut) * 995n) / 1000n;
+        } catch (error) {
+          console.error('Error fetching quote');
+          return 0;
+        }
+      };
+
+      const amountOutMin = await getQuote();
+
+      const transaction: TransactionRequest = {
+        to: wallet,
+        data: encodeFunctionData({
+          abi: BASE_SEPOLIA_WALLET_ABI,
+          functionName: 'mockSwap',
+          args: [tokenIn, tokenOut, amountIn, amountOutMin],
         }),
       };
 
@@ -89,6 +203,41 @@ export class AgentToolService {
       return wallet;
     },
   });
+
+  private getTokenMarketDataByContract =
+    customActionProvider<ViemWalletProvider>({
+      name: 'get_token_market_data_by_contract_address',
+      description:
+        'Retrieves the market data of a token based on its address and the desired chain.',
+      schema: z.object({
+        contractAddress: z.string(),
+        chain: z.enum([Network.BASE_MAINNET, Network.BASE_SEPOLIA]),
+      }),
+      invoke: async (walletProvider, args: any) => {
+        const { contractAddress, chain } = args;
+
+        this.logger.log(
+          `Fetching metadata for ${contractAddress} on ${chain}...`,
+        );
+
+        const tokenMetadata = await this.alchemyService.getTokenMetadata(
+          contractAddress,
+          chain,
+        );
+
+        if (tokenMetadata.symbol === 'UNKNOWN') return 'Token not found';
+
+        this.logger.log(
+          `Fetching market data for ${tokenMetadata.name} (${tokenMetadata.symbol})...`,
+        );
+
+        const tokenMarketData = await this.tokensService.getTokenMarketDataById(
+          tokenMetadata.name,
+        );
+
+        return tokenMarketData;
+      },
+    });
 
   private convertEthToWei = customActionProvider<ViemWalletProvider>({
     name: 'convert_eth_to_wei',

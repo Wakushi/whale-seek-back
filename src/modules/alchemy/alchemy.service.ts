@@ -14,12 +14,14 @@ import {
   Wallet,
   WalletTokenBalance,
 } from '../tokens/entities/token.type';
+import { TokensService } from '../tokens/tokens.services';
 
 @Injectable()
 export class AlchemyService {
   constructor(
     @Inject('ALCHEMY_CONFIG')
     private readonly config: { apiKey: string; network: Network },
+    private readonly tokenService: TokensService,
   ) {}
 
   public async getTokenBalances(
@@ -56,9 +58,7 @@ export class AlchemyService {
             metadata.decimals,
           );
 
-          const tokenPrice = await this.getTokenPriceInUSD(
-            balance.contractAddress,
-          );
+          const tokenPrice = await this.getTokenPriceInUSD(metadata.name);
 
           const valueInUSD = tokenAmount * tokenPrice;
 
@@ -123,13 +123,8 @@ export class AlchemyService {
     }
   }
 
-  /**
-   * Gets a token's price in USD .
-   * @param contractAddress - The token's contract address.
-   * @returns The token's price in USD.
-   */
-  private async getTokenPriceInUSD(contractAddress: string): Promise<number> {
-    return 0;
+  private async getTokenPriceInUSD(tokenName: string): Promise<number> {
+    return this.tokenService.getTokenPrice(tokenName);
   }
 
   public async getWalletTokenTransfers(
