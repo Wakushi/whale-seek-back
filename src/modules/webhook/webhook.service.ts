@@ -2,6 +2,7 @@ import { Injectable, HttpException, HttpStatus, Inject } from '@nestjs/common';
 import fetch from 'node-fetch';
 import { SupabaseService } from '../supabase/supabase.service';
 import { Collection } from '../supabase/entities/collections';
+import { WebhookPayload } from './entities/webhook.type';
 
 @Injectable()
 export class WebhookService {
@@ -82,17 +83,42 @@ export class WebhookService {
     }
   }
 
-  async processTransaction(webhookData) {
+  async processTransaction(webhookData: WebhookPayload) {
     try {
+      if (
+        !webhookData?.event?.activity ||
+        !Array.isArray(webhookData.event.activity)
+      ) {
+        return {
+          success: true,
+          message: 'No transactions to process',
+          data: [],
+        };
+      }
+
+      const processedTxs = new Set<string>();
+
       const transactions = webhookData.event.activity.map(async (activity) => {
-        console.log('Processing activity:', activity);
+        if (!activity) return null;
+
+        console.log('activity: ', activity);
+
+        if (processedTxs.has(activity.hash)) {
+          console.log(`Skipping duplicate transaction: ${activity.hash}`);
+          return null;
+        }
+        processedTxs.add(activity.hash);
 
         const transactionRecord = {
           transaction_hash: activity.hash,
           from_address: activity.fromAddress,
           to_address: activity.toAddress,
-          contract_address: activity.toAddress,
+          contract_address:
+            activity.category === 'token'
+              ? activity.rawContract.address
+              : activity.toAddress,
           value: activity.value,
+          asset: activity.asset,
         };
 
         console.log('Transaction record to insert:', transactionRecord);
@@ -103,7 +129,9 @@ export class WebhookService {
         );
       });
 
-      const results = await Promise.all(transactions);
+      const results = (await Promise.all(transactions)).filter(
+        (result) => result !== null,
+      );
 
       return {
         success: true,
