@@ -17,32 +17,29 @@ import {
 
 @Injectable()
 export class AlchemyService {
-  public _client: Alchemy;
-
   constructor(
     @Inject('ALCHEMY_CONFIG')
     private readonly config: { apiKey: string; network: Network },
-  ) {
-    this._client = new Alchemy({
-      apiKey: config.apiKey,
-      network: config.network,
+  ) {}
+
+  public async getTokenBalances(
+    walletAddress: Address,
+    chain: Network = Network.BASE_SEPOLIA,
+  ): Promise<Wallet> {
+    const client = new Alchemy({
+      apiKey: this.config.apiKey,
+      network: chain,
     });
-  }
 
-  public get client() {
-    return this._client;
-  }
-
-  public async getTokenBalances(walletAddress: Address): Promise<Wallet> {
     try {
-      const ethBalanceHex = await this.client.core.getBalance(walletAddress);
+      const ethBalanceHex = await client.core.getBalance(walletAddress);
       const ethBalanceHexString = ethBalanceHex.toHexString();
       const ethBalance = hexToDecimal(ethBalanceHexString, 18);
 
       const ethPrice = await this.getTokenPriceInUSD('ETH');
       const ethValueInUSD = ethBalance * ethPrice;
 
-      const balances = await this.client.core.getTokenBalances(walletAddress);
+      const balances = await client.core.getTokenBalances(walletAddress);
 
       const nonZeroBalances = balances.tokenBalances.filter((token) => {
         return token.tokenBalance !== NULL_BALANCE;
@@ -96,13 +93,21 @@ export class AlchemyService {
     }
   }
 
-  public async getTokenMetadata(contractAddress: Address): Promise<{
+  public async getTokenMetadata(
+    contractAddress: Address,
+    chain: Network = Network.BASE_SEPOLIA,
+  ): Promise<{
     name: string;
     symbol: string;
     decimals: number;
   }> {
     try {
-      const metadata = await this.client.core.getTokenMetadata(contractAddress);
+      const client = new Alchemy({
+        apiKey: this.config.apiKey,
+        network: chain,
+      });
+
+      const metadata = await client.core.getTokenMetadata(contractAddress);
       return {
         name: metadata.name || 'Unknown Token',
         symbol: metadata.symbol || 'UNKNOWN',
@@ -129,8 +134,14 @@ export class AlchemyService {
 
   public async getWalletTokenTransfers(
     walletAddress: Address,
+    chain: Network = Network.BASE_SEPOLIA,
   ): Promise<AssetTransfersResult[]> {
     try {
+      const client = new Alchemy({
+        apiKey: this.config.apiKey,
+        network: chain,
+      });
+
       const allTransfers: AssetTransfersResult[] = [];
 
       const getTransfers = async (
@@ -155,7 +166,7 @@ export class AlchemyService {
           payload.pageKey = pageKey;
         }
 
-        const data = await this.client.core.getAssetTransfers(payload);
+        const data = await client.core.getAssetTransfers(payload);
 
         return data;
       };

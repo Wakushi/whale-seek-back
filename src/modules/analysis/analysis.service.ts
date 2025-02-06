@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { TokensService } from '../tokens/tokens.services';
 import { AlchemyService } from '../alchemy/alchemy.service';
 import { Address } from 'viem';
-import { AssetTransfersResult } from 'alchemy-sdk';
+import { AssetTransfersResult, Network } from 'alchemy-sdk';
 import {
   CoinCodexBaseTokenData,
   CoinCodexCsvDailyMetrics,
@@ -34,15 +34,19 @@ export class AnalysisService {
     coinCodexList: CoinCodexBaseTokenData[],
   ): Promise<AccountAnalysis | null> {
     try {
-      const walletHoldings: Wallet =
-        await this.alchemyService.getTokenBalances(wallet);
+      const walletHoldings: Wallet = await this.alchemyService.getTokenBalances(
+        wallet,
+        Network.BASE_MAINNET,
+      );
 
       const analyzer = new WalletAnalyzer();
 
       const walletAnalysis = analyzer.analyzeWalletDistribution(walletHoldings);
 
-      const transfers =
-        await this.alchemyService.getWalletTokenTransfers(wallet);
+      const transfers = await this.alchemyService.getWalletTokenTransfers(
+        wallet,
+        Network.BASE_MAINNET,
+      );
 
       const profitabilityScore = await this.analyseTransfersProfits(
         transfers,
