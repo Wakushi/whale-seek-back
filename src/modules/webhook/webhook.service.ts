@@ -101,8 +101,6 @@ export class WebhookService {
       const transactions = webhookData.event.activity.map(async (activity) => {
         if (!activity) return null;
 
-        console.log('activity: ', activity);
-
         if (processedTxs.has(activity.hash)) {
           console.log(`Skipping duplicate transaction: ${activity.hash}`);
           return null;
@@ -111,6 +109,7 @@ export class WebhookService {
 
         const transactionRecord = {
           transaction_hash: activity.hash,
+          block_number: activity.blockNum,
           from_address: activity.fromAddress,
           to_address: activity.toAddress,
           contract_address:
@@ -119,6 +118,10 @@ export class WebhookService {
               : activity.toAddress,
           value: activity.value,
           asset: activity.asset,
+          category: activity.category,
+          decimals: activity.rawContract.decimals,
+          raw_value: activity.rawContract.rawValue,
+          network: webhookData.event.network,
         };
 
         console.log('Transaction record to insert:', transactionRecord);
