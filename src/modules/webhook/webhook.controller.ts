@@ -8,7 +8,11 @@ export class WebhookController {
   @Patch('add-addresses')
   async addAddresses(
     @Headers('X-Alchemy-Token')
-    @Body() updateDto: { webhook_id: string; addresses_to_add: string[] }
+    @Body()
+    updateDto: {
+      webhook_id: string;
+      addresses_to_add: string[];
+    },
   ) {
     return this.webhookService.addAddresses(updateDto);
   }
@@ -16,13 +20,18 @@ export class WebhookController {
   @Patch('remove-addresses')
   async removeAddresses(
     @Headers('X-Alchemy-Token')
-    @Body() updateDto: { webhook_id: string; addresses_to_remove: string[] }
+    @Body()
+    updateDto: {
+      webhook_id: string;
+      addresses_to_remove: string[];
+    },
   ) {
     return this.webhookService.removeAddresses(updateDto);
   }
 
   @Post('transaction')
   async handleTransaction(@Req() request, @Body() data: any) {
+    console.log('Webhook call received !');
     return this.webhookService.processTransaction(data);
   }
 }
