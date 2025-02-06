@@ -15,6 +15,7 @@ import { WebhookModule } from './modules/webhook/webhook.module';
 import { CoinbaseModule } from './modules/coinbase/coinbase.module';
 import { AgentModule } from './modules/agent/agent.module';
 import { WhalesModule } from './modules/whales/whales.module';
+import { TransactionsModule } from './modules/transactions/transactions.module';
 
 @Module({
   imports: [
@@ -50,7 +51,8 @@ import { WhalesModule } from './modules/whales/whales.module';
       privateKey: process.env.PRIVATE_KEY,
     }),
     AgentModule,
-    WhalesModule.forRoot()
+    WhalesModule.forRoot(),
+    TransactionsModule,
   ],
 })
 export class AppModule {}
