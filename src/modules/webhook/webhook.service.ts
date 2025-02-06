@@ -85,6 +85,7 @@ export class WebhookService {
 
   async processTransaction(webhookData: WebhookPayload) {
     console.log('webhookData: ', webhookData);
+    console.log('ACTIVITY: ', webhookData.event.activity);
 
     try {
       if (
