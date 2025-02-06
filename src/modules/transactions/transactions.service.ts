@@ -33,7 +33,15 @@ export class TransactionsService {
     };
 
     await this.saveTransaction(transactionRecord);
+
+    this.analyseTransaction(transactionRecord);
   }
+
+  private async analyseTransaction(
+    transactionRecord: TransactionRecord,
+  ): Promise<void> {}
+
+  private async copyTransaction(): Promise<void> {}
 
   private async saveTransaction(transaction: TransactionRecord): Promise<void> {
     await this.supabaseService.insertSingle(

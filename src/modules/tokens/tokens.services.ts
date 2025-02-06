@@ -14,6 +14,7 @@ import {
 import { access } from 'fs/promises';
 import Fuse from 'fuse.js';
 import { COINGECKO_TOKEN_LIST } from './data/coingecko-list';
+import { TransferToken } from '../analysis/entities/analysis.type';
 
 @Injectable()
 export class TokensService {
@@ -401,5 +402,39 @@ export class TokensService {
       console.error('Error fetching coin codex list: ', error);
       return [];
     }
+  }
+
+  public async getTokenDailyMetrics(
+    token: TransferToken,
+    symbol: string,
+  ): Promise<CoinCodexCsvDailyMetrics[]> {
+    if (!token || !symbol) return [];
+
+    const staticSupplyMetrics: SupplyMetrics | null =
+      await this.fetchSupplyMetrics(symbol.toLowerCase());
+
+    let dailyMetrics: CoinCodexCsvDailyMetrics[] = [];
+
+    try {
+      if (staticSupplyMetrics) {
+        dailyMetrics = await this.fetchDailyMetrics(staticSupplyMetrics.name);
+      }
+    } catch (error) {
+      dailyMetrics = await this.fetchDailyMetrics(symbol.toLowerCase());
+    }
+
+    if (!dailyMetrics.length) {
+      this.logger.log(
+        `No daily metrics found for token ${token.name.toLowerCase()}`,
+      );
+
+      return [];
+    }
+
+    dailyMetrics.sort(
+      (a, b) => new Date(a.Start).getTime() - new Date(b.Start).getTime(),
+    );
+
+    return dailyMetrics;
   }
 }
