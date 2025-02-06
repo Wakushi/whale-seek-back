@@ -310,7 +310,7 @@ export class AgentToolService {
         abi: [
           {
             type: 'function',
-            name: 'getOwnerWallets',
+            name: 'getOwnerWallet',
             inputs: [
               {
                 internalType: 'address',
@@ -320,15 +320,15 @@ export class AgentToolService {
             ],
             outputs: [
               {
-                internalType: 'address[]',
+                internalType: 'address',
                 name: '',
-                type: 'address[]',
+                type: 'address',
               },
             ],
             stateMutability: 'view',
           },
         ],
-        functionName: 'getOwnerWallets',
+        functionName: 'getOwnerWallet',
         args: [owner],
       })) as Address[];
 
