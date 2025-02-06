@@ -11,6 +11,10 @@ export const envSchema = z.object({
   BRAVE_API_KEY: z.string(),
   WEBHOOK_ID: z.string(),
   ALCHEMY_AUTH_KEY: z.string(),
+  CDP_API_KEY_NAME: z.string(),
+  CDP_API_KEY_PRIVATE_KEY: z.string(),
+  NETWORK_ID: z.string(),
+  PRIVATE_KEY: z.string(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
