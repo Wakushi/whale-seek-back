@@ -51,7 +51,7 @@ export class AgentToolService {
           this.getTokenMarketDataById,
           this.getTokenBalances,
           this.searchWeb,
-          this.getOwnerTradingWallets,
+          this.getOwnerTradingWallet,
         ];
       case Agent.TRANSACTION_ANALYST:
         return [
@@ -69,7 +69,7 @@ export class AgentToolService {
           this.getTokenMarketDataById,
           this.getTokenBalances,
           this.searchWeb,
-          this.getOwnerTradingWallets,
+          this.getOwnerTradingWallet,
         ];
     }
   }
@@ -293,8 +293,8 @@ export class AgentToolService {
     },
   });
 
-  private getOwnerTradingWallets = customActionProvider<ViemWalletProvider>({
-    name: 'get_owner_trading_wallets',
+  private getOwnerTradingWallet = customActionProvider<ViemWalletProvider>({
+    name: 'get_owner_trading_wallet',
     description:
       'Retrieves all trading wallet addresses owned by a specific address from the factory contract.',
     schema: z.object({
@@ -305,7 +305,7 @@ export class AgentToolService {
 
       this.logger.log(`Fetching ${owner} trading wallets...`);
 
-      const wallets = (await walletProvider.readContract({
+      const wallet = (await walletProvider.readContract({
         address: BASE_SEPOLIA_FACTORY_ADDRESS,
         abi: [
           {
@@ -330,13 +330,13 @@ export class AgentToolService {
         ],
         functionName: 'getOwnerWallet',
         args: [owner],
-      })) as Address[];
+      })) as Address;
 
-      if (wallets.length === 0) {
-        return `No wallets found for address ${owner}`;
+      if (!wallet) {
+        return `No wallet found for address ${owner}`;
       }
 
-      return `Trading Wallet owned by ${owner}:\n${wallets.join(', ')}`;
+      return `Trading Wallet owned by ${owner}:\n${wallet}`;
     },
   });
 }
