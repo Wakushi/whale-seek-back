@@ -6,6 +6,8 @@ import { WebhookPayload } from './entities/webhook.type';
 
 @Injectable()
 export class WebhookService {
+  processedTransactions: Set<string> = new Set();
+
   constructor(
     @Inject('WEBHOOK_CONFIG')
     private readonly config: { alchemyAuthKey: string; webhookId: string },
@@ -84,9 +86,6 @@ export class WebhookService {
   }
 
   async processTransaction(webhookData: WebhookPayload) {
-    console.log('webhookData: ', webhookData);
-    console.log('ACTIVITY: ', webhookData.event.activity);
-
     try {
       if (
         !webhookData?.event?.activity ||
@@ -99,50 +98,43 @@ export class WebhookService {
         };
       }
 
-      const processedTxs = new Set<string>();
-
-      const transactions = webhookData.event.activity.map(async (activity) => {
-        if (!activity) return null;
-
-        if (processedTxs.has(activity.hash)) {
-          console.log(`Skipping duplicate transaction: ${activity.hash}`);
-          return null;
+      for (const transaction of webhookData.event.activity) {
+        if (
+          this.processedTransactions.has(transaction.hash) ||
+          transaction.category !== 'token'
+        ) {
+          continue;
         }
-        processedTxs.add(activity.hash);
+
+        console.log(
+          `Processing ${webhookData.id} for hash ${transaction.hash}...`,
+        );
 
         const transactionRecord = {
-          transaction_hash: activity.hash,
-          block_number: activity.blockNum,
-          from_address: activity.fromAddress,
-          to_address: activity.toAddress,
-          contract_address:
-            activity.category === 'token'
-              ? activity.rawContract.address
-              : activity.toAddress,
-          value: activity.value,
-          asset: activity.asset,
-          category: activity.category,
-          decimals: activity.rawContract.decimals,
-          raw_value: activity.rawContract.rawValue,
+          transaction_hash: transaction.hash,
+          block_number: transaction.blockNum,
+          from_address: transaction.fromAddress,
+          to_address: transaction.toAddress,
+          contract_address: transaction.rawContract.address,
+          value: transaction.value,
+          asset: transaction.asset,
+          category: transaction.category,
+          decimals: transaction.rawContract.decimals,
+          raw_value: transaction.rawContract.rawValue,
           network: webhookData.event.network,
         };
 
-        console.log('Transaction record to insert:', transactionRecord);
-
-        return await this.supabaseService.insertSingle(
+        await this.supabaseService.insertSingle(
           Collection.TRANSACTIONS,
           transactionRecord,
         );
-      });
 
-      const results = (await Promise.all(transactions)).filter(
-        (result) => result !== null,
-      );
+        this.processedTransactions.add(transaction.hash);
+      }
 
       return {
         success: true,
-        message: `${results.length} transactions processed successfully`,
-        data: results,
+        message: `Transactions processed successfully`,
       };
     } catch (error) {
       console.error('Error processing transaction:', error);

@@ -31,7 +31,6 @@ export class WebhookController {
 
   @Post('transaction')
   async handleTransaction(@Req() request, @Body() data: any) {
-    console.log('Webhook call received !');
     return this.webhookService.processTransaction(data);
   }
 }

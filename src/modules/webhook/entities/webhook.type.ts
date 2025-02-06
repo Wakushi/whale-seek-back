@@ -20,7 +20,7 @@ interface Activity {
   erc721TokenId: null | string;
   erc1155Metadata: null | any;
   asset: string;
-  category: string;
+  category: 'external' | 'token';
   rawContract: RawContract;
   typeTraceAddress: null | string;
   log: LogEntry;
