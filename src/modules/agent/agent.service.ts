@@ -30,4 +30,26 @@ export class AgentService {
       return null;
     }
   }
+
+  public async askTradingAgent(
+    tradingWallet: Address,
+    transactionRecord: Omit<TransactionRecord, 'id'>,
+  ): Promise<string> {
+    try {
+      if (!transactionRecord) {
+        throw new Error('Missing transaction record.');
+      }
+
+      if (!tradingWallet) {
+        throw new Error('Missing trading wallet address.');
+      }
+
+      return await this.coinbaseService.askTradingAgent(
+        tradingWallet,
+        transactionRecord,
+      );
+    } catch (error) {
+      return null;
+    }
+  }
 }

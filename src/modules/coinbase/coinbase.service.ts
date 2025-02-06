@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AgentKit,
   wethActionProvider,
@@ -21,6 +21,7 @@ import { AgentToolService } from './agent-tool.service';
 import { Agent, TransactionAnalystResult } from './entities/agent.type';
 import {
   GENERAL_AGENT_PROMPT,
+  TRADING_AGENT_PROMPT,
   TRANSACTION_ANALYST_PROMPT,
 } from './entities/prompt';
 import { TransactionRecord } from '../transactions/entities/transaction.entity';
@@ -32,6 +33,11 @@ export class CoinbaseService {
 
   private transactionAnalystAgent: any;
   private transactionAnalystAgentConfig: any;
+
+  private tradingAgent: any;
+  private tradingAgentConfig: any;
+
+  private readonly logger = new Logger(CoinbaseService.name);
 
   constructor(
     @Inject('COINBASE_CONFIG')
@@ -45,6 +51,7 @@ export class CoinbaseService {
   ) {
     this.initializeAgent(Agent.GENERAL);
     this.initializeAgent(Agent.TRANSACTION_ANALYST);
+    this.initializeAgent(Agent.TRADING);
   }
 
   public async askAgent(query: string, user: Address): Promise<string> {
@@ -70,6 +77,8 @@ export class CoinbaseService {
         }
       }
 
+      this.logger.log('General Agent completed task !');
+
       return messages.join(' ');
     } catch (error) {
       console.error('Error while querying Agent. ', error);
@@ -92,7 +101,7 @@ export class CoinbaseService {
         {
           messages: [
             new HumanMessage(
-              `Transaction to analyse: ${JSON.stringify(transactionRecord)}`,
+              `Transaction to analyse: ${JSON.stringify(transactionRecord)}. This trade represents ${transactionRecord.trade_wallet_percentage} of the trader wallet.`,
             ),
           ],
         },
@@ -111,7 +120,50 @@ export class CoinbaseService {
         }
       }
 
+      this.logger.log('Transaction Analyst Agent completed task !');
+
       return JSON.parse(messages[0]);
+    } catch (error) {
+      console.error('Error while querying Agent. ', error);
+      return null;
+    }
+  }
+
+  public async askTradingAgent(
+    wallet: Address,
+    transactionRecord: Omit<TransactionRecord, 'id'>,
+  ): Promise<string> {
+    try {
+      if (!this.tradingAgent || !this.tradingAgentConfig) {
+        throw new Error('Agent not initialized');
+      }
+
+      const stream = await this.tradingAgent.stream(
+        {
+          messages: [
+            new HumanMessage(
+              `Trading wallet is ${wallet}, the whale transaction is ${JSON.stringify(transactionRecord)}`,
+            ),
+          ],
+        },
+        this.tradingAgentConfig,
+      );
+
+      const messages: string[] = [];
+
+      for await (const chunk of stream) {
+        if ('agent' in chunk) {
+          const message = chunk.agent.messages[0].content;
+
+          if (message) {
+            messages.push(message);
+          }
+        }
+      }
+
+      this.logger.log('Trading Agent completed task !');
+
+      return messages.join(' ');
     } catch (error) {
       console.error('Error while querying Agent. ', error);
       return null;
@@ -179,6 +231,10 @@ export class CoinbaseService {
           this.transactionAnalystAgent = agent;
           this.transactionAnalystAgentConfig = agentConfig;
           break;
+        case Agent.TRADING:
+          this.tradingAgent = agent;
+          this.tradingAgentConfig = agentConfig;
+          break;
         default:
           this.generalAgent = agent;
           this.generalAgentConfig = agentConfig;
@@ -196,6 +252,8 @@ export class CoinbaseService {
         return GENERAL_AGENT_PROMPT;
       case Agent.TRANSACTION_ANALYST:
         return TRANSACTION_ANALYST_PROMPT;
+      case Agent.TRADING:
+        return TRADING_AGENT_PROMPT;
       default:
         return GENERAL_AGENT_PROMPT;
     }

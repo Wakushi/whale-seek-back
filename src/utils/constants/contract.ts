@@ -1,7 +1,7 @@
 export const BASE_SEPOLIA_FACTORY_ADDRESS =
-  '0x3cc2cf7fd36f72a19c9b6bdfadce5406274b751d';
+  '0xE89F35FEb880165D4aBD77094673d28333c6F91a';
 
-export const BASE_SEPOLIA_FACTORY_ABI = [
+export const FACTORY_ABI = [
   {
     inputs: [
       {
@@ -33,6 +33,11 @@ export const BASE_SEPOLIA_FACTORY_ABI = [
       },
     ],
     name: 'OwnableUnauthorizedAccount',
+    type: 'error',
+  },
+  {
+    inputs: [],
+    name: 'WhaleSeekFactory__AlreadyDeployed',
     type: 'error',
   },
   {
@@ -140,12 +145,12 @@ export const BASE_SEPOLIA_FACTORY_ABI = [
         type: 'address',
       },
     ],
-    name: 'getOwnerWallets',
+    name: 'getOwnerWallet',
     outputs: [
       {
-        internalType: 'address[]',
+        internalType: 'address',
         name: '',
-        type: 'address[]',
+        type: 'address',
       },
     ],
     stateMutability: 'view',

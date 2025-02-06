@@ -13,7 +13,7 @@ export class TransactionsController {
 
   @Post()
   @HttpCode(200)
-  async testTransactionAnalysis() {
-    return this.transactionsService.analyseTransaction(MOCK_TRANSACTION);
+  async testTrade() {
+    return this.transactionsService.copyTransaction(MOCK_TRANSACTION);
   }
 }

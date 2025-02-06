@@ -17,7 +17,7 @@ contract WhaleSeekFactory is Ownable {
     
     mapping(address => WalletInfo) private s_walletInfo;
     
-    mapping(address => address[]) private s_ownerWallets;
+    mapping(address => address) private s_walletByOwner;
 
     event WalletDeployed(
         address indexed walletAddress,
@@ -28,6 +28,7 @@ contract WhaleSeekFactory is Ownable {
 
     error WhaleSeekFactory__ZeroAddress();
     error WhaleSeekFactory__DeploymentFailed();
+    error WhaleSeekFactory__AlreadyDeployed();
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
@@ -40,6 +41,10 @@ contract WhaleSeekFactory is Ownable {
     function deployWallet(address owner, address agent) external onlyOwner returns (address wallet) {
         if (owner == address(0) || agent == address(0)) {
             revert WhaleSeekFactory__ZeroAddress();
+        }
+
+        if(s_walletByOwner[owner] != address(0)) {
+            revert WhaleSeekFactory__AlreadyDeployed();
         }
 
         wallet = address(new WhaleSeekWallet(owner, agent));
@@ -57,7 +62,7 @@ contract WhaleSeekFactory is Ownable {
 
         s_walletInfo[wallet] = newWallet;
         s_deployedWallets.push(wallet);
-        s_ownerWallets[owner].push(wallet);
+        s_walletByOwner[owner] = wallet;
 
         emit WalletDeployed(wallet, owner, agent, block.timestamp);
     }
@@ -76,8 +81,8 @@ contract WhaleSeekFactory is Ownable {
      * @param owner Address of the owner
      * @return Array of wallet addresses owned by the owner
      */
-    function getOwnerWallets(address owner) external view returns (address[] memory) {
-        return s_ownerWallets[owner];
+    function getOwnerWallet(address owner) external view returns (address) {
+        return s_walletByOwner[owner];
     }
 
     /**
