@@ -15,6 +15,17 @@ import { TokensService } from '../tokens/tokens.services';
 import { BraveService } from '../brave/brave.service';
 import { AlchemyService } from '../alchemy/alchemy.service';
 import { Network } from 'alchemy-sdk';
+import { Agent } from './entities/agent.type';
+
+const TransactionAnalystResponseFormatter = z.object({
+  analysis: z.string(),
+  score: z.number(),
+});
+
+const GeneralResponseFormatter = z.object({
+  answer: z.string(),
+  suggestions: z.number(),
+});
 
 @Injectable()
 export class AgentToolService {
@@ -26,15 +37,45 @@ export class AgentToolService {
     private readonly alchemyService: AlchemyService,
   ) {}
 
-  public get tools(): any[] {
-    return [
-      this.deployTradingWallet,
-      this.convertEthToWei,
-      this.getTokenMarketDataById,
-      this.getTokenBalances,
-      this.searchWeb,
-      this.getOwnerTradingWallets,
-    ];
+  public getAgentTools(agent: Agent = Agent.GENERAL): any[] {
+    switch (agent) {
+      case Agent.GENERAL:
+        return [
+          this.deployTradingWallet,
+          this.convertEthToWei,
+          this.getTokenMarketDataById,
+          this.getTokenBalances,
+          this.searchWeb,
+          this.getOwnerTradingWallets,
+        ];
+      case Agent.TRANSACTION_ANALYST:
+        return [
+          this.getTokenMarketDataByContract,
+          this.convertEthToWei,
+          this.getTokenBalances,
+          this.searchWeb,
+        ];
+      default:
+        return [
+          this.deployTradingWallet,
+          this.convertEthToWei,
+          this.getTokenMarketDataById,
+          this.getTokenBalances,
+          this.searchWeb,
+          this.getOwnerTradingWallets,
+        ];
+    }
+  }
+
+  public getAgentFormatting(agent: Agent = Agent.GENERAL): any {
+    switch (agent) {
+      case Agent.GENERAL:
+        return GeneralResponseFormatter;
+      case Agent.TRANSACTION_ANALYST:
+        return TransactionAnalystResponseFormatter;
+      default:
+        return GeneralResponseFormatter;
+    }
   }
 
   private deployTradingWallet = customActionProvider<ViemWalletProvider>({
@@ -126,6 +167,41 @@ export class AgentToolService {
       return tokenData;
     },
   });
+
+  private getTokenMarketDataByContract =
+    customActionProvider<ViemWalletProvider>({
+      name: 'get_token_market_data_by_contract_address',
+      description:
+        'Retrieves the market data of a token based on its address and the desired chain.',
+      schema: z.object({
+        contractAddress: z.string(),
+        chain: z.enum([Network.BASE_MAINNET, Network.BASE_SEPOLIA]),
+      }),
+      invoke: async (walletProvider, args: any) => {
+        const { contractAddress, chain } = args;
+
+        this.logger.log(
+          `Fetching metadata for ${contractAddress} on ${chain}...`,
+        );
+
+        const tokenMetadata = await this.alchemyService.getTokenMetadata(
+          contractAddress,
+          chain,
+        );
+
+        if (tokenMetadata.symbol === 'UNKNOWN') return 'Token not found';
+
+        this.logger.log(
+          `Fetching market data for ${tokenMetadata.name} (${tokenMetadata.symbol})...`,
+        );
+
+        const tokenMarketData = await this.tokensService.getTokenMarketDataById(
+          tokenMetadata.name,
+        );
+
+        return tokenMarketData;
+      },
+    });
 
   private searchWeb = customActionProvider<ViemWalletProvider>({
     name: 'search_web',

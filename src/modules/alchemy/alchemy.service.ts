@@ -123,11 +123,6 @@ export class AlchemyService {
     }
   }
 
-  /**
-   * Gets a token's price in USD .
-   * @param contractAddress - The token's contract address.
-   * @returns The token's price in USD.
-   */
   private async getTokenPriceInUSD(contractAddress: string): Promise<number> {
     return 0;
   }

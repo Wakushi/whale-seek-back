@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
+import { MOCK_TRANSACTION } from './MOCK_TRANSACTION';
 
 @Controller('transactions')
 export class TransactionsController {
@@ -8,5 +9,11 @@ export class TransactionsController {
   @Get()
   findAll() {
     return this.transactionsService.findAll();
+  }
+
+  @Post()
+  @HttpCode(200)
+  async testTransactionAnalysis() {
+    return this.transactionsService.analyseTransaction(MOCK_TRANSACTION);
   }
 }
