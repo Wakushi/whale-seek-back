@@ -195,9 +195,7 @@ export class TransactionsService {
     );
 
     const outputTransfer = transfers.find(
-      (transfer) =>
-        transfer.to === getAddress(activity.toAddress) &&
-        transfer.from === getAddress(matchedDEX.routers[0]),
+      (transfer) => transfer.to === getAddress(initiator),
     );
 
     if (!inputTransfer || !outputTransfer) {
