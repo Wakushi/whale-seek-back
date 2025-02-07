@@ -1,7 +1,5 @@
 export enum Collection {
   WHALE_INFO = 'whale_info',
-}
-
-export enum Collection {
-  TRANSACTIONS = "transactions",
+  TRANSACTIONS = 'transactions',
+  TOKEN_METADATA = 'token_metadata',
 }

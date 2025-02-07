@@ -61,7 +61,11 @@ export class AgentToolService {
           this.searchWeb,
         ];
       case Agent.TRADING:
-        return [this.swapTokens, this.getTokenBalances];
+        return [
+          this.swapTokens,
+          this.getTokenBalances,
+          this.getTokenMarketDataById,
+        ];
       default:
         return [
           this.deployTradingWallet,
@@ -140,7 +144,13 @@ export class AgentToolService {
     invoke: async (walletProvider, args: any) => {
       const { wallet, tokenIn, tokenOut, amountIn } = args;
 
-      this.logger.log(`Swapping tokens for ${wallet} wallet...`);
+      this.logger.log(
+        `Preparing swap tokens for wallet ${wallet}:
+        Token In: ${tokenIn.symbol} (${tokenIn.address})
+        Token Out: ${tokenOut.symbol} (${tokenOut.address}) 
+        Amount In: ${amountIn} ${tokenIn.symbol}
+        Timestamp: ${new Date().toISOString()}`,
+      );
 
       const getQuote = async () => {
         try {
@@ -176,7 +186,9 @@ export class AgentToolService {
 
       const hash = await walletProvider.sendTransaction(transaction);
 
-      return `Transaction hash: ${hash}`;
+      this.logger.log(`Swap executed -> ${hash}`);
+
+      return `Swap executed ! Transaction hash: ${hash}`;
     },
   });
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { TransactionRecord } from './entities/transaction.entity';
 import { SupabaseService } from '../supabase/supabase.service';
 import { Collection } from '../supabase/entities/collections';
@@ -13,6 +13,8 @@ import { Whale } from '../discovery/entities/discovery.type';
 
 @Injectable()
 export class TransactionsService {
+  private readonly logger = new Logger(TransactionsService.name);
+
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly agentService: AgentService,
@@ -41,6 +43,10 @@ export class TransactionsService {
     );
 
     if (!whale) return;
+
+    this.logger.log(
+      `Recording webhook trade event for whale ${whale.whale_address}...`,
+    );
 
     const transactionRecord: Omit<TransactionRecord, 'id'> = {
       transaction_hash: activity.hash,
@@ -74,12 +80,18 @@ export class TransactionsService {
   public async analyseTransaction(
     transactionRecord: Omit<TransactionRecord, 'id'>,
   ): Promise<any> {
+    this.logger.log(
+      `Analyzing transaction ${transactionRecord.transaction_hash}`,
+    );
+
     const analysis: TransactionAnalystResult | null =
       await this.agentService.askTransactionAnalysisAgent(transactionRecord);
 
     if (!analysis) return;
 
     const MIN_THRESHOLD = 70;
+
+    this.logger.log(`Analysis score result: ${analysis.score}`);
 
     if (analysis.score < MIN_THRESHOLD) return;
 
@@ -92,6 +104,10 @@ export class TransactionsService {
     transactionRecord: Omit<TransactionRecord, 'id'>,
   ): Promise<any> {
     const wallets = await this.contractService.fetchAllTradingWallets();
+
+    this.logger.log(
+      `Dispatching trade order to ${wallets.length} network wallets (${transactionRecord.transaction_hash})`,
+    );
 
     for (const wallet of wallets) {
       await this.agentService.askTradingAgent(wallet, transactionRecord);

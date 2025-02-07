@@ -14,68 +14,44 @@ import {
 import { access } from 'fs/promises';
 import Fuse from 'fuse.js';
 import { TransferToken } from '../analysis/entities/analysis.type';
+import { SupabaseService } from '../supabase/supabase.service';
+import { CoinGeckoTokenMetadata } from './entities/coin-gecko.type';
+import { Collection } from '../supabase/entities/collections';
 
 @Injectable()
 export class TokensService {
   private readonly COINGECKO_API = 'https://api.coingecko.com/api/v3';
 
-  private readonly logger = new Logger(TokensService.name);
-
-  constructor(private readonly csvService: CsvService) {}
+  constructor(
+    private readonly csvService: CsvService,
+    private readonly supabaseService: SupabaseService,
+  ) {}
 
   async getCoinGeckoTokenIdByName(tokenName: string): Promise<string | null> {
     try {
-      const performWeightedSearch = (
-        searchedName: string,
-        searchList: Array<CoinCodexBaseTokenData | CoinCodexListToken>,
-        isExternalList = false,
-      ): { id: string; score: number; marketCapRank?: number } | null => {
-        const fuse = new Fuse(searchList, {
-          keys: ['name', 'symbol'],
-          includeScore: true,
-          threshold: 0.4,
-          findAllMatches: true,
-        });
+      const internalTokenList =
+        await this.supabaseService.getAll<CoinGeckoTokenMetadata>(
+          Collection.TOKEN_METADATA,
+        );
 
-        const results = fuse.search(searchedName);
-        if (!results.length) return null;
-
-        const rankedResults = results
-          .map((result) => {
-            const item = result.item as
-              | CoinCodexBaseTokenData
-              | CoinCodexListToken;
-            const fuzzyScore = 1 - (result.score || 0);
-
-            const marketCapRank = isExternalList
-              ? (item as CoinCodexBaseTokenData).market_cap_rank
-              : null;
-
-            const weightedScore = marketCapRank
-              ? fuzzyScore * 0.7 +
-                ((1000 - Math.min(marketCapRank, 1000)) / 1000) * 0.3
-              : fuzzyScore;
-
-            return {
-              id: isExternalList
-                ? (item as CoinCodexBaseTokenData).ccu_slug
-                : (item as CoinCodexListToken).id,
-              score: weightedScore,
-              marketCapRank,
-            };
-          })
-          .sort((a, b) => b.score - a.score);
-
-        return rankedResults[0];
-      };
+      if (internalTokenList.length) {
+        const externalResult = this.performWeightedSearch(
+          tokenName,
+          internalTokenList,
+          'coinGecko',
+        );
+        if (externalResult && externalResult.score > 0.6) {
+          return externalResult.id;
+        }
+      }
 
       const externalTokenList = await this.getCoinCodexCoinList();
 
       if (externalTokenList.length) {
-        const externalResult = performWeightedSearch(
+        const externalResult = this.performWeightedSearch(
           tokenName,
           externalTokenList,
-          true,
+          'coinCodexCache',
         );
         if (externalResult && externalResult.score > 0.6) {
           return externalResult.id;
@@ -92,7 +68,11 @@ export class TokensService {
       const tokens: CoinCodexListToken[] = await response.json();
       if (!tokens?.length) return null;
 
-      const geckoResult = performWeightedSearch(tokenName, tokens);
+      const geckoResult = this.performWeightedSearch(
+        tokenName,
+        tokens,
+        'coinCodexList',
+      );
       if (!geckoResult) return null;
 
       return geckoResult.id;
@@ -498,5 +478,70 @@ export class TokensService {
     );
 
     return dailyMetrics;
+  }
+
+  private performWeightedSearch(
+    searchedName: string,
+    searchList: Array<
+      CoinGeckoTokenMetadata | CoinCodexBaseTokenData | CoinCodexListToken
+    >,
+    searchType: 'coinGecko' | 'coinCodexCache' | 'coinCodexList',
+  ): { id: string; score: number; marketCapRank?: number } | null {
+    const fuse = new Fuse(searchList, {
+      keys: ['name', 'symbol'],
+      includeScore: true,
+      threshold: 0.4,
+      findAllMatches: true,
+    });
+
+    const results = fuse.search(searchedName);
+
+    if (!results.length) return null;
+
+    const rankedResults = results
+      .map((result) => {
+        const item = result.item as
+          | CoinGeckoTokenMetadata
+          | CoinCodexBaseTokenData
+          | CoinCodexListToken;
+
+        const fuzzyScore = 1 - (result.score || 0);
+
+        const getMarketCapRank = (item: any) => {
+          switch (searchType) {
+            case 'coinGecko':
+            case 'coinCodexCache':
+              return item.market_cap_rank;
+            case 'coinCodexList':
+              return null;
+          }
+        };
+
+        const marketCapRank = getMarketCapRank(item);
+
+        const weightedScore = marketCapRank
+          ? fuzzyScore * 0.7 +
+            ((1000 - Math.min(marketCapRank, 1000)) / 1000) * 0.3
+          : fuzzyScore;
+
+        const getId = (item: any) => {
+          switch (searchType) {
+            case 'coinGecko':
+            case 'coinCodexList':
+              return item.id;
+            case 'coinCodexCache':
+              return item.ccu_slug;
+          }
+        };
+
+        return {
+          id: getId(item),
+          score: weightedScore,
+          marketCapRank,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    return rankedResults[0];
   }
 }
