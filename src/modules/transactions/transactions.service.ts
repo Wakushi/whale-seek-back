@@ -36,13 +36,22 @@ export class TransactionsService {
       Collection.WHALE_INFO,
     );
 
+    this.logger.log(
+      `Searching for origin whale in ${whales.length} collection..`,
+    );
+
     const whale = whales.find(
       (w) =>
         w.whale_address === activity.fromAddress ||
         w.whale_address === activity.toAddress,
     );
 
-    if (!whale) return;
+    if (!whale) {
+      this.logger.log(
+        `No whale found for ${activity.fromAddress} | ${activity.toAddress} addresses`,
+      );
+      return;
+    }
 
     this.logger.log(
       `Recording webhook trade event for whale ${whale.whale_address}...`,
