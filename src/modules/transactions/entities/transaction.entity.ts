@@ -1,3 +1,6 @@
+import { BigNumber } from 'alchemy-sdk';
+import { Address } from 'viem';
+
 export interface TransactionRecord {
   id: string;
   transaction_hash: string;
@@ -14,4 +17,24 @@ export interface TransactionRecord {
   network: string;
   timestamp?: string;
   trade_wallet_percentage?: number;
+}
+
+export interface DEXProtocol {
+  name: string;
+  routers: string[];
+  factory?: string;
+}
+
+export interface Transfer {
+  token: string;
+  from: string;
+  to: string;
+  value: BigNumber;
+}
+
+export interface SwapAnalysis {
+  protocol: string;
+  inputToken: string | undefined;
+  outputToken: string | undefined;
+  initiator: Address;
 }

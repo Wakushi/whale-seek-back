@@ -17,12 +17,12 @@ export interface Activity {
   fromAddress: string;
   toAddress: string;
   value: number;
-  erc721TokenId: null | string;
-  erc1155Metadata: null | any;
+  erc721TokenId?: null | string;
+  erc1155Metadata?: null | any;
   asset: string;
   category: 'external' | 'token';
   rawContract: RawContract;
-  typeTraceAddress: null | string;
+  typeTraceAddress?: null | string;
   log: LogEntry;
 }
 

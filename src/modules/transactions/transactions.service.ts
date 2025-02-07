@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TransactionRecord } from './entities/transaction.entity';
+import { SwapAnalysis, TransactionRecord } from './entities/transaction.entity';
 import { SupabaseService } from '../supabase/supabase.service';
 import { Collection } from '../supabase/entities/collections';
 import { Activity } from '../webhook/entities/webhook.type';
@@ -10,6 +10,8 @@ import { AlchemyService } from '../alchemy/alchemy.service';
 import { Address, getAddress } from 'viem';
 import { WalletTokenBalance } from '../tokens/entities/token.type';
 import { Whale } from '../discovery/entities/discovery.type';
+import { DEX_PROTOCOLS } from './data/dexes';
+import { BigNumber } from 'alchemy-sdk';
 
 @Injectable()
 export class TransactionsService {
@@ -32,7 +34,8 @@ export class TransactionsService {
     activity: Activity,
     network: string,
   ): Promise<void> {
-    this.logger.log(
+    console.log('================');
+    console.log(
       `Analyzing activity:\n` +
         `  Asset:    ${activity.asset}\n` +
         `  Value:    ${activity.value}\n` +
@@ -42,21 +45,25 @@ export class TransactionsService {
         `  Hash:     ${activity.hash}`,
     );
 
-    console.log('Activity: ', JSON.stringify(activity));
-    console.log('Log: ', JSON.stringify(activity.log));
+    const swapInfo = await this.extractSwapInfo(activity);
+
+    if (!swapInfo) {
+      this.logger.log('Could not extract swap information.');
+      return;
+    }
+
+    console.log('Swap: ', swapInfo);
 
     const whales = await this.supabaseService.getAll<Whale>(
       Collection.WHALE_INFO,
     );
 
     this.logger.log(
-      `Searching for origin whale in ${whales.length} whales collection..`,
+      `Searching for origin whale ${swapInfo.initiator} in ${whales.length} whales collection..`,
     );
 
     const whale = whales.find(
-      (w) =>
-        w.whale_address.toLowerCase() === activity.fromAddress.toLowerCase() ||
-        w.whale_address.toLowerCase() === activity.toAddress.toLowerCase(),
+      (w) => getAddress(w.whale_address) === getAddress(swapInfo.initiator),
     );
 
     if (!whale) {
@@ -64,12 +71,6 @@ export class TransactionsService {
         `No whale found for ${activity.fromAddress} | ${activity.toAddress} addresses`,
       );
       return;
-    }
-
-    const isSwap = this.isSwapTransaction(activity, whale.whale_address);
-
-    if (!isSwap) {
-      this.logger.log('No swap detected.');
     }
 
     this.logger.log(
@@ -184,58 +185,65 @@ export class TransactionsService {
     return Math.round(percentage * 100) / 100;
   }
 
-  private async isSwapTransaction(
+  private async extractSwapInfo(
     activity: Activity,
-    whaleAddress: Address,
-  ): Promise<boolean> {
-    const BASE_DEX_ADDRESSES = [
-      // Uniswap V3
-      '0x2626664c2603336E57B271c5C0b26F421741e481', // SwapRouter02
-      '0x198EF79F1F515F02dFE9e3115eD9fC07183f02fC', // Universal Router
-
-      // Uniswap V4
-      '0x6ff5693b99212da76ad316178a184ab56d299b43', // Universal Router
-
-      // BaseSwap
-      '0x327Df1E6de05895d2ab08513aaDD9313Fe505d86', // Router
-
-      // Aerodrome
-      '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43', // Router
-
-      // SushiSwap
-      '0x8c47ED459d3688Ca14d67CE84E053600fcB9EC31', // V3 Router
-
-      // Alienbase/RocketSwap
-      '0x94cC0AaC535CCDB3C01d6787D6413C27ae39Bf77', // Router
-
-      // Pancakeswap
-      '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86', // SmartRouter
-
-      // Maverick
-      '0x32AED3Bce901DA12ca8489788F3A99fCE1056e14', // Router
-    ];
-
-    const CHECKSUM_DEX_ADDRESSES = BASE_DEX_ADDRESSES.map((address) =>
-      getAddress(address),
+  ): Promise<SwapAnalysis | null> {
+    const receipt = await this.contractService.provider.getTransactionReceipt(
+      activity.hash,
     );
 
-    const isWhaleSellingToDex =
-      getAddress(activity.fromAddress) === getAddress(whaleAddress) &&
-      CHECKSUM_DEX_ADDRESSES.includes(getAddress(activity.toAddress));
+    const initiator = getAddress(receipt.from);
 
-    const isWhaleReceivingTokens =
-      getAddress(activity.toAddress) === getAddress(whaleAddress) &&
-      CHECKSUM_DEX_ADDRESSES.includes(getAddress(activity.fromAddress));
+    const involvedAddresses = new Set<string>([
+      getAddress(receipt.from),
+      getAddress(receipt.to),
+      ...receipt.logs.map((log) => getAddress(log.address)),
+      ...receipt.logs.flatMap((log) =>
+        log.topics
+          .filter((topic) => topic.length === 66)
+          .map((topic) => getAddress('0x' + topic.slice(26))),
+      ),
+    ]);
 
-    this.logger.log(
-      `Swap detection:\n` +
-        `  Is whale selling to DEX: ${isWhaleSellingToDex}\n` +
-        `  Is whale receiving tokens: ${isWhaleReceivingTokens}\n` +
-        `  From: ${activity.fromAddress}\n` +
-        `  To: ${activity.toAddress}\n` +
-        `  Token Contract: ${activity.rawContract.address}`,
+    const matchedDEX = DEX_PROTOCOLS.find((dex) =>
+      dex.routers.some((router) => involvedAddresses.has(getAddress(router))),
     );
 
-    return isWhaleSellingToDex || isWhaleReceivingTokens;
+    if (!matchedDEX) {
+      return null;
+    }
+
+    const TRANSFER_EVENT_SIGNATURE =
+      '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+
+    const transfers = receipt.logs
+      .filter((log) => log.topics[0] === TRANSFER_EVENT_SIGNATURE)
+      .map((log) => ({
+        token: log.address,
+        from: getAddress('0x' + log.topics[1].slice(26)),
+        to: getAddress('0x' + log.topics[2].slice(26)),
+        value: BigNumber.from(log.data),
+      }));
+
+    const userTransfers = transfers.filter(
+      (transfer) =>
+        transfer.from === getAddress(activity.fromAddress) ||
+        transfer.to === getAddress(activity.fromAddress),
+    );
+
+    const inputTransfer = userTransfers.find(
+      (transfer) => transfer.from === getAddress(activity.fromAddress),
+    );
+
+    const outputTransfer = userTransfers.find(
+      (transfer) => transfer.to === getAddress(activity.fromAddress),
+    );
+
+    return {
+      protocol: matchedDEX.name,
+      inputToken: inputTransfer?.token,
+      outputToken: outputTransfer?.token,
+      initiator,
+    };
   }
 }

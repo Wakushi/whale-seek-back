@@ -39,7 +39,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     AnalysisModule.forRoot(),
     BlockExplorerModule.forRoot({ apiKey: process.env.BASESCAN_API_KEY }),
     ContractModule.forRoot({
-      rpcUrl: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+      rpcUrl: `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
     }),
     WebhookModule.forRoot({
       alchemyAuthKey: process.env.ALCHEMY_AUTH_KEY,
