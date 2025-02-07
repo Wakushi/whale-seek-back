@@ -26,7 +26,7 @@ export class AlchemyService {
 
   public async getTokenBalances(
     walletAddress: Address,
-    chain: Network = Network.BASE_SEPOLIA,
+    chain: Network = Network.BASE_MAINNET,
   ): Promise<Wallet> {
     const client = new Alchemy({
       apiKey: this.config.apiKey,
@@ -96,7 +96,7 @@ export class AlchemyService {
 
   public async getTokenMetadata(
     contractAddress: Address,
-    chain: Network = Network.BASE_SEPOLIA,
+    chain: Network = Network.BASE_MAINNET,
   ): Promise<{
     name: string;
     symbol: string;
@@ -130,7 +130,7 @@ export class AlchemyService {
 
   public async getWalletTokenTransfers(
     walletAddress: Address,
-    chain: Network = Network.BASE_SEPOLIA,
+    chain: Network = Network.BASE_MAINNET,
   ): Promise<AssetTransfersResult[]> {
     try {
       const client = new Alchemy({

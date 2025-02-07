@@ -12,7 +12,7 @@ import {
 } from 'viem';
 import {
   FACTORY_ABI,
-  BASE_SEPOLIA_FACTORY_ADDRESS,
+  BASE_MAINNET_FACTORY_ADDRESS,
   BASE_SEPOLIA_WALLET_ABI,
 } from 'src/utils/constants/contract';
 import { z } from 'zod';
@@ -105,7 +105,7 @@ export class AgentToolService {
       const agentAddress = walletProvider.getAddress();
 
       const transaction: TransactionRequest = {
-        to: BASE_SEPOLIA_FACTORY_ADDRESS,
+        to: BASE_MAINNET_FACTORY_ADDRESS,
         data: encodeFunctionData({
           abi: FACTORY_ABI,
           functionName: 'deployWallet',
@@ -326,7 +326,7 @@ export class AgentToolService {
       this.logger.log(`Fetching ${owner} trading wallets...`);
 
       const wallet = (await walletProvider.readContract({
-        address: BASE_SEPOLIA_FACTORY_ADDRESS,
+        address: BASE_MAINNET_FACTORY_ADDRESS,
         abi: [
           {
             type: 'function',

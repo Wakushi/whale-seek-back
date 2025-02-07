@@ -15,7 +15,7 @@ import { MemorySaver } from '@langchain/langgraph';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { ChatOpenAI } from '@langchain/openai';
 import { Address, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { AgentToolService } from './agent-tool.service';
 import { Agent, TransactionAnalystResult } from './entities/agent.type';
@@ -180,7 +180,7 @@ export class CoinbaseService {
 
       const client = createWalletClient({
         account,
-        chain: baseSepolia,
+        chain: base,
         transport: http(),
       });
 

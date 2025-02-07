@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Contract, JsonRpcProvider } from 'ethers';
 import {
   FACTORY_ABI,
-  BASE_SEPOLIA_FACTORY_ADDRESS,
+  BASE_MAINNET_FACTORY_ADDRESS,
 } from 'src/utils/constants/contract';
 import { Address } from 'viem';
 
@@ -17,7 +17,7 @@ export class ContractService {
   ) {
     this._provider = new JsonRpcProvider(config.rpcUrl);
     this._factoryContract = new Contract(
-      BASE_SEPOLIA_FACTORY_ADDRESS,
+      BASE_MAINNET_FACTORY_ADDRESS,
       FACTORY_ABI,
       this._provider,
     );
