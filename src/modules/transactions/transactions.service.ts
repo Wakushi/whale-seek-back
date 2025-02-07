@@ -10,7 +10,7 @@ import { AlchemyService } from '../alchemy/alchemy.service';
 import { Address, getAddress } from 'viem';
 import { WalletTokenBalance } from '../tokens/entities/token.type';
 import { DEX_PROTOCOLS } from './data/dexes';
-import { BigNumber } from 'alchemy-sdk';
+import { BigNumber, Network } from 'alchemy-sdk';
 
 @Injectable()
 export class TransactionsService {
@@ -58,6 +58,7 @@ export class TransactionsService {
 
     const whalePortfolio = await this.alchemyService.getTokenBalances(
       transactionRecord.whale_address as Address,
+      Network.BASE_MAINNET,
     );
 
     const tradePortfolioPercentage = await this.getTradePortfolioRepartition(
