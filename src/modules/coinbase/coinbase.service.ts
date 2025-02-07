@@ -173,7 +173,7 @@ export class CoinbaseService {
   private async initializeAgent(agentType: Agent): Promise<void> {
     try {
       let model = new ChatOpenAI({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
       });
 
       const account = privateKeyToAccount(this.config.privateKey as Address);
