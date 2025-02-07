@@ -32,23 +32,42 @@ export class TransactionsService {
     activity: Activity,
     network: string,
   ): Promise<void> {
+    this.logger.log(
+      `Analyzing activity: Asset ${activity.asset} | Value ${activity.value} | From ${activity.fromAddress} | To ${activity.toAddress} | Contract ${activity.rawContract.address} (${activity.hash})`,
+    );
+
     const whales = await this.supabaseService.getAll<Whale>(
       Collection.WHALE_INFO,
     );
 
     this.logger.log(
-      `Searching for origin whale in ${whales.length} collection..`,
+      `Searching for origin whale in ${whales.length} whales collection..`,
     );
 
     const whale = whales.find(
       (w) =>
-        w.whale_address === activity.fromAddress ||
-        w.whale_address === activity.toAddress,
+        w.whale_address.toLowerCase() === activity.fromAddress.toLowerCase() ||
+        w.whale_address.toLowerCase() === activity.toAddress.toLowerCase(),
     );
 
     if (!whale) {
       this.logger.log(
         `No whale found for ${activity.fromAddress} | ${activity.toAddress} addresses`,
+      );
+      return;
+    }
+
+    const interactedAddress =
+      activity.fromAddress.toLowerCase() === whale.whale_address.toLowerCase()
+        ? activity.toAddress
+        : activity.fromAddress;
+
+    const isContract =
+      await this.contractService.isContractAddress(interactedAddress);
+
+    if (!isContract) {
+      this.logger.log(
+        `Interacted address ${interactedAddress} is not a contract.`,
       );
       return;
     }
@@ -73,7 +92,7 @@ export class TransactionsService {
     };
 
     const whalePortfolio = await this.alchemyService.getTokenBalances(
-      transactionRecord.from_address as Address,
+      transactionRecord.whale_address as Address,
     );
 
     const tradePortfolioPercentage = await this.getTradePortfolioRepartition(
