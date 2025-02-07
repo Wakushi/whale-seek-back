@@ -54,7 +54,7 @@ export class TransactionsService {
       protocol,
     };
 
-    console.log('transactionRecord: ', transactionRecord);
+    console.log('Transaction record: ', transactionRecord);
 
     const whalePortfolio = await this.alchemyService.getTokenBalances(
       transactionRecord.whale_address as Address,
@@ -83,7 +83,7 @@ export class TransactionsService {
 
     if (!analysis) return;
 
-    const MIN_THRESHOLD = 70;
+    const MIN_THRESHOLD = 40;
 
     this.logger.log(`Analysis score result: ${analysis.score}`);
 
