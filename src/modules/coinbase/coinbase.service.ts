@@ -60,8 +60,16 @@ export class CoinbaseService {
         throw new Error('Agent not initialized');
       }
 
+      const today = new Date();
+
       const stream = await this.generalAgent.stream(
-        { messages: [new HumanMessage(`[USER ADDRESS: ${user}] ${query}`)] },
+        {
+          messages: [
+            new HumanMessage(
+              `[DATE: ${today}] [USER ADDRESS: ${user}] ${query}`,
+            ),
+          ],
+        },
         this.generalAgentConfig,
       );
 
@@ -173,7 +181,7 @@ export class CoinbaseService {
   private async initializeAgent(agentType: Agent): Promise<void> {
     try {
       let model = new ChatOpenAI({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
       });
 
       const account = privateKeyToAccount(this.config.privateKey as Address);
