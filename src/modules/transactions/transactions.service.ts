@@ -190,31 +190,54 @@ export class TransactionsService {
       }))
       .sort((a, b) => a.logIndex - b.logIndex);
 
-    const userTransfers = transfers.filter(
+    const inputTransfer = transfers.find(
+      (transfer) => transfer.from === getAddress(initiator),
+    );
+
+    const outputTransfer = transfers.find(
       (transfer) =>
-        transfer.from === getAddress(activity.fromAddress) ||
-        transfer.to === getAddress(activity.fromAddress),
+        transfer.to === getAddress(activity.toAddress) &&
+        transfer.from === getAddress(matchedDEX.routers[0]),
     );
-
-    if (userTransfers.length < 2) {
-      return null;
-    }
-
-    const inputTransfer = userTransfers.find(
-      (transfer) => transfer.from === getAddress(activity.fromAddress),
-    );
-
-    const outputTransfer = [...userTransfers]
-      .reverse()
-      .find((transfer) => transfer.to === getAddress(activity.fromAddress));
 
     if (!inputTransfer || !outputTransfer) {
+      const whaleTransfers = transfers.filter(
+        (transfer) =>
+          transfer.from === getAddress(activity.fromAddress) ||
+          transfer.to === getAddress(activity.toAddress),
+      );
+
+      if (whaleTransfers.length >= 2) {
+        const firstWhaleTransfer = whaleTransfers.find(
+          (transfer) => transfer.from === getAddress(activity.fromAddress),
+        );
+        const lastWhaleTransfer = [...whaleTransfers]
+          .reverse()
+          .find((transfer) => transfer.to === getAddress(activity.toAddress));
+
+        if (
+          firstWhaleTransfer &&
+          lastWhaleTransfer &&
+          firstWhaleTransfer.token !== lastWhaleTransfer.token
+        ) {
+          return {
+            protocol: matchedDEX.name,
+            inputToken: firstWhaleTransfer.token,
+            outputToken: lastWhaleTransfer.token,
+            initiator,
+          };
+        }
+      }
       return null;
     }
 
     if (inputTransfer.token === outputTransfer.token) {
       return null;
     }
+
+    this.logger.log(
+      `${initiator} swapped ${inputTransfer.token} for ${outputTransfer.token}`,
+    );
 
     return {
       protocol: matchedDEX.name,
