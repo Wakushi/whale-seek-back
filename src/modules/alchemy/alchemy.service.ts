@@ -38,7 +38,7 @@ export class AlchemyService {
       const ethBalanceHexString = ethBalanceHex.toHexString();
       const ethBalance = hexToDecimal(ethBalanceHexString, 18);
 
-      const ethPrice = await this.getTokenPriceInUSD('ETH');
+      const ethPrice = await this.getTokenPriceInUSD('ETHEREUM');
       const ethValueInUSD = ethBalance * ethPrice;
 
       const balances = await client.core.getTokenBalances(walletAddress);
@@ -51,6 +51,7 @@ export class AlchemyService {
         nonZeroBalances.map(async (balance) => {
           const metadata = await this.getTokenMetadata(
             balance.contractAddress as Address,
+            chain,
           );
 
           const tokenAmount = hexToDecimal(

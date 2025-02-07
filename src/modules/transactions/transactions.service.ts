@@ -99,6 +99,8 @@ export class TransactionsService {
   ): Promise<any> {
     const wallets = await this.contractService.fetchAllTradingWallets();
 
+    if (!wallets || !wallets.length) return;
+
     this.logger.log(
       `Dispatching trade order to ${wallets.length} network wallets (${transactionRecord.transaction_hash})`,
     );
@@ -121,17 +123,11 @@ export class TransactionsService {
     walletBalances: WalletTokenBalance[],
     transaction: Omit<TransactionRecord, 'id'>,
   ): Promise<number> {
-    console.log('Starting getTradePortfolioRepartition method');
-    console.log('Wallet Balances:', walletBalances);
-    console.log('Transaction:', transaction);
-
     const inputToken = walletBalances.find(
       (token) =>
         token.contractAddress?.toLowerCase() ===
         transaction.input_token?.toLowerCase(),
     );
-
-    console.log('Input Token:', inputToken);
 
     const outputToken = walletBalances.find(
       (token) =>
@@ -139,14 +135,10 @@ export class TransactionsService {
         transaction.output_token?.toLowerCase(),
     );
 
-    console.log('Output Token:', outputToken);
-
     const totalPortfolioValue = walletBalances.reduce((sum, token) => {
       const tokenValue = parseFloat(token.valueInUSD || '0');
       return sum + tokenValue;
     }, 0);
-
-    console.log('Total Portfolio Value:', totalPortfolioValue);
 
     if (totalPortfolioValue === 0) {
       console.log('Total Portfolio Value is 0, returning 0');
@@ -160,10 +152,6 @@ export class TransactionsService {
         parseFloat(inputToken.valueInUSD) / parseFloat(inputToken.balance);
       const inputValueInUSD = transaction.value * inputTokenPriceInUSD;
       transactionValueInUSD = Math.max(transactionValueInUSD, inputValueInUSD);
-
-      console.log('Input Token Price in USD:', inputTokenPriceInUSD);
-      console.log('Input Value in USD:', inputValueInUSD);
-      console.log('Updated Transaction Value in USD:', transactionValueInUSD);
     }
 
     if (outputToken) {
@@ -171,10 +159,6 @@ export class TransactionsService {
         parseFloat(outputToken.valueInUSD) / parseFloat(outputToken.balance);
       const outputValueInUSD = transaction.value * outputTokenPriceInUSD;
       transactionValueInUSD = Math.max(transactionValueInUSD, outputValueInUSD);
-
-      console.log('Output Token Price in USD:', outputTokenPriceInUSD);
-      console.log('Output Value in USD:', outputValueInUSD);
-      console.log('Updated Transaction Value in USD:', transactionValueInUSD);
     }
 
     if (!inputToken && !outputToken) {
@@ -184,9 +168,6 @@ export class TransactionsService {
 
     const percentage = (transactionValueInUSD / totalPortfolioValue) * 100;
     const roundedPercentage = Math.round(percentage * 100) / 100;
-
-    console.log('Calculated Percentage:', percentage);
-    console.log('Rounded Percentage:', roundedPercentage);
 
     return roundedPercentage;
   }
