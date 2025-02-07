@@ -42,6 +42,9 @@ export class TransactionsService {
         `  Hash:     ${activity.hash}`,
     );
 
+    console.log('Activity: ', JSON.stringify(activity));
+    console.log('Log: ', JSON.stringify(activity.log));
+
     const whales = await this.supabaseService.getAll<Whale>(
       Collection.WHALE_INFO,
     );
@@ -190,6 +193,9 @@ export class TransactionsService {
       '0x2626664c2603336E57B271c5C0b26F421741e481', // SwapRouter02
       '0x198EF79F1F515F02dFE9e3115eD9fC07183f02fC', // Universal Router
 
+      // Uniswap V4
+      '0x6ff5693b99212da76ad316178a184ab56d299b43', // Universal Router
+
       // BaseSwap
       '0x327Df1E6de05895d2ab08513aaDD9313Fe505d86', // Router
 
@@ -219,7 +225,7 @@ export class TransactionsService {
 
     const isWhaleReceivingTokens =
       getAddress(activity.toAddress) === getAddress(whaleAddress) &&
-      CHECKSUM_DEX_ADDRESSES.includes(getAddress(activity.rawContract.address));
+      CHECKSUM_DEX_ADDRESSES.includes(getAddress(activity.fromAddress));
 
     this.logger.log(
       `Swap detection:\n` +
