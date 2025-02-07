@@ -32,55 +32,17 @@ export class TransactionsService {
 
   public async recordWebhookEvent(
     activity: Activity,
+    swapInfo: SwapAnalysis,
     network: string,
   ): Promise<void> {
-    console.log('================');
-    console.log(
-      `Analyzing activity:\n` +
-        `  Asset:    ${activity.asset}\n` +
-        `  Value:    ${activity.value}\n` +
-        `  From:     ${activity.fromAddress}\n` +
-        `  To:       ${activity.toAddress}\n` +
-        `  Contract: ${activity.rawContract.address}\n` +
-        `  Hash:     ${activity.hash}`,
-    );
-
-    const swapInfo = await this.extractSwapInfo(activity);
-
-    if (!swapInfo) {
-      this.logger.log('Could not extract swap information.');
-      return;
-    }
-
-    console.log('Swap: ', swapInfo);
-
-    const whales = await this.supabaseService.getAll<Whale>(
-      Collection.WHALE_INFO,
-    );
-
     this.logger.log(
-      `Searching for origin whale ${swapInfo.initiator} in ${whales.length} whales collection..`,
-    );
-
-    const whale = whales.find(
-      (w) => getAddress(w.whale_address) === getAddress(swapInfo.initiator),
-    );
-
-    if (!whale) {
-      this.logger.log(
-        `No whale found for ${activity.fromAddress} | ${activity.toAddress} addresses`,
-      );
-      return;
-    }
-
-    this.logger.log(
-      `Recording webhook trade event for whale ${whale.whale_address}...`,
+      `Recording webhook trade event for whale ${swapInfo.initiator}...`,
     );
 
     const transactionRecord: Omit<TransactionRecord, 'id'> = {
       transaction_hash: activity.hash,
       block_number: activity.blockNum,
-      whale_address: whale.whale_address,
+      whale_address: swapInfo.initiator,
       from_address: activity.fromAddress,
       to_address: activity.toAddress,
       contract_address: activity.rawContract.address,
@@ -185,7 +147,7 @@ export class TransactionsService {
     return Math.round(percentage * 100) / 100;
   }
 
-  private async extractSwapInfo(
+  public async extractSwapInfo(
     activity: Activity,
   ): Promise<SwapAnalysis | null> {
     const receipt = await this.contractService.provider.getTransactionReceipt(
