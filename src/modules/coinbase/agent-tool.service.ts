@@ -236,22 +236,26 @@ export class AgentToolService {
           `Fetching metadata for ${contractAddress} on ${chain}...`,
         );
 
-        const tokenMetadata = await this.alchemyService.getTokenMetadata(
-          contractAddress,
-          chain,
-        );
+        try {
+          const tokenMetadata = await this.alchemyService.getTokenMetadata(
+            contractAddress,
+            chain,
+          );
 
-        if (tokenMetadata.symbol === 'UNKNOWN') return 'Token not found';
+          if (tokenMetadata.symbol === 'UNKNOWN') return 'Token not found';
 
-        this.logger.log(
-          `Fetching market data for ${tokenMetadata.name} (${tokenMetadata.symbol})...`,
-        );
+          this.logger.log(
+            `Fetching market data for ${tokenMetadata.name} (${tokenMetadata.symbol})...`,
+          );
 
-        const tokenMarketData = await this.tokensService.getTokenMarketDataById(
-          tokenMetadata.name,
-        );
+          const tokenMarketData =
+            await this.tokensService.getTokenMarketDataById(tokenMetadata.name);
 
-        return tokenMarketData;
+          return tokenMarketData;
+        } catch (error) {
+          console.error('Error in tool getTokenMarketDataByContract :', error);
+          return 'Something wrong happened while retrieving market data by contract address.';
+        }
       },
     });
 
