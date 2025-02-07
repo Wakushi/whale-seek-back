@@ -10,6 +10,7 @@ import { AccountAnalysis } from '../analysis/entities/analysis.type';
 import { TokensService } from '../tokens/tokens.services';
 import { sortWhalesByEfficiency } from 'src/utils/performances.helper';
 import { WebhookService } from '../webhook/webhook.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class DiscoveryService {
@@ -23,7 +24,10 @@ export class DiscoveryService {
     private readonly webhookService: WebhookService,
   ) {}
 
+  @Cron(CronExpression.EVERY_DAY_AT_4AM)
   public async discoverWhales(): Promise<void> {
+    this.logger.log('Initiating whale discovery...');
+
     const foundWhales = await this.findWhales();
 
     const registeredWhales = await this.supabaseService.getAll<Whale>(
@@ -74,7 +78,7 @@ export class DiscoveryService {
     );
   }
 
-  public async findWhales(): Promise<WhaleDetection[]> {
+  private async findWhales(): Promise<WhaleDetection[]> {
     const recentTransfers = await this.queryLargeTransfers();
 
     const whalesMap: Map<Address, WhaleDetection> = new Map();
@@ -123,12 +127,12 @@ export class DiscoveryService {
 
   private async queryLargeTransfers(): Promise<WethTransferQuery[]> {
     const today = Math.floor(Date.now() / 1000);
-    const ONE_MONTH = 30 * 24 * 60 * 60;
-    const oneMonthAgo = today - ONE_MONTH;
+    const ONE_DAY = 24 * 60 * 60;
+    const oneDayAgo = today - ONE_DAY;
 
     try {
       const transfers = await this.graphService.queryLargeWethTransfers({
-        fromTimestamp: oneMonthAgo,
+        fromTimestamp: oneDayAgo,
         minWethTransfered: 50,
       });
 

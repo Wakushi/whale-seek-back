@@ -36,4 +36,9 @@ export class ContractService {
       return [];
     }
   }
+
+  public async isContractAddress(address: string): Promise<boolean> {
+    const bytecode = await this.provider.getCode(address);
+    return bytecode !== '0x';
+  }
 }

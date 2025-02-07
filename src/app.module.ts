@@ -16,6 +16,7 @@ import { CoinbaseModule } from './modules/coinbase/coinbase.module';
 import { AgentModule } from './modules/agent/agent.module';
 import { WhalesModule } from './modules/whales/whales.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
     AgentModule,
     WhalesModule.forRoot(),
     TransactionsModule,
+    ScheduleModule.forRoot(),
   ],
 })
 export class AppModule {}
