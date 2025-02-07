@@ -9,7 +9,6 @@ import { ContractService } from '../contract/contract.service';
 import { AlchemyService } from '../alchemy/alchemy.service';
 import { Address, getAddress } from 'viem';
 import { WalletTokenBalance } from '../tokens/entities/token.type';
-import { Whale } from '../discovery/entities/discovery.type';
 import { DEX_PROTOCOLS } from './data/dexes';
 import { BigNumber } from 'alchemy-sdk';
 
@@ -150,6 +149,8 @@ export class TransactionsService {
   public async extractSwapInfo(
     activity: Activity,
   ): Promise<SwapAnalysis | null> {
+    console.log('[extractSwapInfo] activity: ', activity);
+
     const receipt = await this.contractService.provider.getTransactionReceipt(
       activity.hash,
     );
@@ -180,12 +181,14 @@ export class TransactionsService {
 
     const transfers = receipt.logs
       .filter((log) => log.topics[0] === TRANSFER_EVENT_SIGNATURE)
-      .map((log) => ({
-        token: log.address,
+      .map((log, index) => ({
+        token: getAddress(log.address),
         from: getAddress('0x' + log.topics[1].slice(26)),
         to: getAddress('0x' + log.topics[2].slice(26)),
         value: BigNumber.from(log.data),
-      }));
+        logIndex: index,
+      }))
+      .sort((a, b) => a.logIndex - b.logIndex);
 
     const userTransfers = transfers.filter(
       (transfer) =>
@@ -193,18 +196,30 @@ export class TransactionsService {
         transfer.to === getAddress(activity.fromAddress),
     );
 
+    if (userTransfers.length < 2) {
+      return null;
+    }
+
     const inputTransfer = userTransfers.find(
       (transfer) => transfer.from === getAddress(activity.fromAddress),
     );
 
-    const outputTransfer = userTransfers.find(
-      (transfer) => transfer.to === getAddress(activity.fromAddress),
-    );
+    const outputTransfer = [...userTransfers]
+      .reverse()
+      .find((transfer) => transfer.to === getAddress(activity.fromAddress));
+
+    if (!inputTransfer || !outputTransfer) {
+      return null;
+    }
+
+    if (inputTransfer.token === outputTransfer.token) {
+      return null;
+    }
 
     return {
       protocol: matchedDEX.name,
-      inputToken: inputTransfer?.token,
-      outputToken: outputTransfer?.token,
+      inputToken: inputTransfer.token,
+      outputToken: outputTransfer.token,
       initiator,
     };
   }
