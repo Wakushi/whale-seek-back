@@ -7,7 +7,7 @@ import { AgentService } from '../agent/agent.service';
 import { TransactionAnalystResult } from '../coinbase/entities/agent.type';
 import { ContractService } from '../contract/contract.service';
 import { AlchemyService } from '../alchemy/alchemy.service';
-import { Address } from 'viem';
+import { Address, getAddress } from 'viem';
 import { WalletTokenBalance } from '../tokens/entities/token.type';
 import { Whale } from '../discovery/entities/discovery.type';
 
@@ -33,7 +33,13 @@ export class TransactionsService {
     network: string,
   ): Promise<void> {
     this.logger.log(
-      `Analyzing activity: Asset ${activity.asset} | Value ${activity.value} | From ${activity.fromAddress} | To ${activity.toAddress} | Contract ${activity.rawContract.address} (${activity.hash})`,
+      `Analyzing activity:\n` +
+        `  Asset:    ${activity.asset}\n` +
+        `  Value:    ${activity.value}\n` +
+        `  From:     ${activity.fromAddress}\n` +
+        `  To:       ${activity.toAddress}\n` +
+        `  Contract: ${activity.rawContract.address}\n` +
+        `  Hash:     ${activity.hash}`,
     );
 
     const whales = await this.supabaseService.getAll<Whale>(
@@ -57,19 +63,10 @@ export class TransactionsService {
       return;
     }
 
-    const interactedAddress =
-      activity.fromAddress.toLowerCase() === whale.whale_address.toLowerCase()
-        ? activity.toAddress
-        : activity.fromAddress;
+    const isSwap = this.isSwapTransaction(activity, whale.whale_address);
 
-    const isContract =
-      await this.contractService.isContractAddress(interactedAddress);
-
-    if (!isContract) {
-      this.logger.log(
-        `Interacted address ${interactedAddress} is not a contract.`,
-      );
-      return;
+    if (!isSwap) {
+      this.logger.log('No swap detected.');
     }
 
     this.logger.log(
@@ -182,5 +179,57 @@ export class TransactionsService {
     const percentage = (transactionValueInUSD / totalPortfolioValue) * 100;
 
     return Math.round(percentage * 100) / 100;
+  }
+
+  private async isSwapTransaction(
+    activity: Activity,
+    whaleAddress: Address,
+  ): Promise<boolean> {
+    const BASE_DEX_ADDRESSES = [
+      // Uniswap V3
+      '0x2626664c2603336E57B271c5C0b26F421741e481', // SwapRouter02
+      '0x198EF79F1F515F02dFE9e3115eD9fC07183f02fC', // Universal Router
+
+      // BaseSwap
+      '0x327Df1E6de05895d2ab08513aaDD9313Fe505d86', // Router
+
+      // Aerodrome
+      '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43', // Router
+
+      // SushiSwap
+      '0x8c47ED459d3688Ca14d67CE84E053600fcB9EC31', // V3 Router
+
+      // Alienbase/RocketSwap
+      '0x94cC0AaC535CCDB3C01d6787D6413C27ae39Bf77', // Router
+
+      // Pancakeswap
+      '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86', // SmartRouter
+
+      // Maverick
+      '0x32AED3Bce901DA12ca8489788F3A99fCE1056e14', // Router
+    ];
+
+    const CHECKSUM_DEX_ADDRESSES = BASE_DEX_ADDRESSES.map((address) =>
+      getAddress(address),
+    );
+
+    const isWhaleSellingToDex =
+      getAddress(activity.fromAddress) === getAddress(whaleAddress) &&
+      CHECKSUM_DEX_ADDRESSES.includes(getAddress(activity.toAddress));
+
+    const isWhaleReceivingTokens =
+      getAddress(activity.toAddress) === getAddress(whaleAddress) &&
+      CHECKSUM_DEX_ADDRESSES.includes(getAddress(activity.rawContract.address));
+
+    this.logger.log(
+      `Swap detection:\n` +
+        `  Is whale selling to DEX: ${isWhaleSellingToDex}\n` +
+        `  Is whale receiving tokens: ${isWhaleReceivingTokens}\n` +
+        `  From: ${activity.fromAddress}\n` +
+        `  To: ${activity.toAddress}\n` +
+        `  Token Contract: ${activity.rawContract.address}`,
+    );
+
+    return isWhaleSellingToDex || isWhaleReceivingTokens;
   }
 }

@@ -5,6 +5,7 @@ import {
   decodeFunctionResult,
   encodeFunctionData,
   encodePacked,
+  getAddress,
   parseEther,
   parseUnits,
   TransactionRequest,
@@ -152,11 +153,14 @@ export class AgentToolService {
         Timestamp: ${new Date().toISOString()}`,
       );
 
+      const formattedTokenIn = getAddress(tokenIn);
+      const formattedTokenOut = getAddress(tokenOut);
+
       const getQuote = async () => {
         try {
           const path = encodePacked(
             ['address', 'uint24', 'address'],
-            [tokenIn, 3000, tokenOut],
+            [formattedTokenIn, 3000, formattedTokenOut],
           );
 
           const amountOut: any = await walletProvider.readContract({
@@ -180,7 +184,7 @@ export class AgentToolService {
         data: encodeFunctionData({
           abi: BASE_SEPOLIA_WALLET_ABI,
           functionName: 'mockSwap',
-          args: [tokenIn, tokenOut, amountIn, amountOutMin],
+          args: [formattedTokenIn, formattedTokenOut, amountIn, amountOutMin],
         }),
       };
 
