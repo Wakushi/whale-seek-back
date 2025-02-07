@@ -38,20 +38,23 @@ export class TransactionsService {
       `Recording webhook trade event for whale ${swapInfo.initiator}...`,
     );
 
+    const { protocol, initiator, inputToken, outputToken } = swapInfo;
+
     const transactionRecord: Omit<TransactionRecord, 'id'> = {
       transaction_hash: activity.hash,
       block_number: activity.blockNum,
-      whale_address: swapInfo.initiator,
-      from_address: activity.fromAddress,
-      to_address: activity.toAddress,
-      contract_address: activity.rawContract.address,
+      whale_address: initiator,
+      input_token: inputToken,
+      output_token: outputToken,
       value: activity.value,
       asset: activity.asset,
-      category: activity.category,
       decimals: activity.rawContract.decimals,
       raw_value: activity.rawContract.rawValue,
       network: network,
+      protocol,
     };
+
+    console.log('transactionRecord: ', transactionRecord);
 
     const whalePortfolio = await this.alchemyService.getTokenBalances(
       transactionRecord.whale_address as Address,
@@ -117,40 +120,79 @@ export class TransactionsService {
     walletBalances: WalletTokenBalance[],
     transaction: Omit<TransactionRecord, 'id'>,
   ): Promise<number> {
-    const transactionToken = walletBalances.find(
+    console.log('Starting getTradePortfolioRepartition method');
+    console.log('Wallet Balances:', walletBalances);
+    console.log('Transaction:', transaction);
+
+    const inputToken = walletBalances.find(
       (token) =>
         token.contractAddress?.toLowerCase() ===
-        transaction.contract_address?.toLowerCase(),
+        transaction.input_token?.toLowerCase(),
     );
 
-    if (!transactionToken) {
-      return 0;
-    }
+    console.log('Input Token:', inputToken);
+
+    const outputToken = walletBalances.find(
+      (token) =>
+        token.contractAddress?.toLowerCase() ===
+        transaction.output_token?.toLowerCase(),
+    );
+
+    console.log('Output Token:', outputToken);
 
     const totalPortfolioValue = walletBalances.reduce((sum, token) => {
       const tokenValue = parseFloat(token.valueInUSD || '0');
       return sum + tokenValue;
     }, 0);
 
+    console.log('Total Portfolio Value:', totalPortfolioValue);
+
     if (totalPortfolioValue === 0) {
+      console.log('Total Portfolio Value is 0, returning 0');
       return 0;
     }
 
-    const tokenPriceInUSD =
-      parseFloat(transactionToken.valueInUSD) /
-      parseFloat(transactionToken.balance);
-    const transactionValueInUSD = transaction.value * tokenPriceInUSD;
+    let transactionValueInUSD = 0;
+
+    if (inputToken) {
+      const inputTokenPriceInUSD =
+        parseFloat(inputToken.valueInUSD) / parseFloat(inputToken.balance);
+      const inputValueInUSD = transaction.value * inputTokenPriceInUSD;
+      transactionValueInUSD = Math.max(transactionValueInUSD, inputValueInUSD);
+
+      console.log('Input Token Price in USD:', inputTokenPriceInUSD);
+      console.log('Input Value in USD:', inputValueInUSD);
+      console.log('Updated Transaction Value in USD:', transactionValueInUSD);
+    }
+
+    if (outputToken) {
+      const outputTokenPriceInUSD =
+        parseFloat(outputToken.valueInUSD) / parseFloat(outputToken.balance);
+      const outputValueInUSD = transaction.value * outputTokenPriceInUSD;
+      transactionValueInUSD = Math.max(transactionValueInUSD, outputValueInUSD);
+
+      console.log('Output Token Price in USD:', outputTokenPriceInUSD);
+      console.log('Output Value in USD:', outputValueInUSD);
+      console.log('Updated Transaction Value in USD:', transactionValueInUSD);
+    }
+
+    if (!inputToken && !outputToken) {
+      console.log('Neither Input nor Output Token found, returning 0');
+      return 0;
+    }
 
     const percentage = (transactionValueInUSD / totalPortfolioValue) * 100;
+    const roundedPercentage = Math.round(percentage * 100) / 100;
 
-    return Math.round(percentage * 100) / 100;
+    console.log('Calculated Percentage:', percentage);
+    console.log('Rounded Percentage:', roundedPercentage);
+
+    return roundedPercentage;
   }
 
   public async extractSwapInfo(
     activity: Activity,
   ): Promise<SwapAnalysis | null> {
-    console.log('[extractSwapInfo] activity: ', activity);
-
     const receipt = await this.contractService.provider.getTransactionReceipt(
       activity.hash,
     );

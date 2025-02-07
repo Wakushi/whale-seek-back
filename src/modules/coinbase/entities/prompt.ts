@@ -35,16 +35,14 @@ export interface TransactionRecord {
   transaction_hash: string;
   block_number: string;
   whale_address: string;
-  from_address: string;
-  to_address: string;
-  contract_address: string;
+  input_token: string;
+  output_token: string;
   value: number;
   asset: string;
-  category: 'external' | 'token';
   decimals: number;
   raw_value: string;
   network: string;
-  timestamp?: string;
+  protocol: string;
   trade_wallet_percentage: number; // Portion of the whale's total holdings this trade represents
 }
 
@@ -63,7 +61,7 @@ export const TRADING_AGENT_PROMPT = `You are an advanced trading execution agent
 
 CORE RESPONSIBILITY:
 Your sole responsibility is to determine HOW to execute the pre-approved trade by:
-1. Looking at the provided transaction info, determine if the whale 'bought' or 'sold'
+1. Looking at the provided swap transaction info, determine what the whale 'bought' and 'sold'
 2. Finding the best token to swap from the trading wallet
 3. Using the swap_tokens tool to execute the transaction
 
