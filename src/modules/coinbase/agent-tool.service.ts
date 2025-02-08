@@ -147,10 +147,9 @@ export class AgentToolService {
 
       this.logger.log(
         `Preparing swap tokens for wallet ${wallet}:
-        Token In: ${tokenIn.symbol} (${tokenIn.address})
-        Token Out: ${tokenOut.symbol} (${tokenOut.address}) 
-        Amount In: ${amountIn} ${tokenIn.symbol}
-        Timestamp: ${new Date().toISOString()}`,
+        Token In: ${tokenIn} 
+        Token Out: ${tokenOut} 
+        Amount In: ${amountIn}`,
       );
 
       const formattedTokenIn = getAddress(tokenIn);
@@ -158,21 +157,34 @@ export class AgentToolService {
 
       const getQuote = async () => {
         try {
-          const path = encodePacked(
-            ['address', 'uint24', 'address'],
-            [formattedTokenIn, 3000, formattedTokenOut],
-          );
+          const params = {
+            exactCurrency: formattedTokenIn,
+            path: [
+              {
+                intermediateCurrency: formattedTokenOut,
+                fee: 3000,
+                tickSpacing: 60,
+                hooks: '0x0000000000000000000000000000000000000000',
+                hookData: '0x',
+              },
+            ],
+            exactAmount: amountIn,
+          };
 
-          const amountOut: any = await walletProvider.readContract({
+          const result: any = await walletProvider.readContract({
             address: QUOTER_V2_ADDRESS,
             abi: QUOTER_V2_ABI,
             functionName: 'quoteExactInput',
-            args: [path, amountIn],
+            args: [params],
           });
+
+          const [amountOut] = result;
+
+          console.log('amountOut: ', amountOut);
 
           return (BigInt(amountOut) * 995n) / 1000n;
         } catch (error) {
-          console.error('Error fetching quote');
+          console.error('Error fetching quote:', error);
           return 0;
         }
       };

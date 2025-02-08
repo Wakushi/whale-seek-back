@@ -78,9 +78,9 @@ For each available token in the wallet:
 - Compare liquidity and market conditions to determine the optimal token to swap
 
 3. TRADE EXECUTION
-You MUST execute the trade using the swap_tokens tool unless the wallet is empty. When executing:
+You MUST execute the trade using the swap_tokens tool unless the trading wallet is empty. When executing:
 - Choose the token from the wallet with the best market conditions
-- Use the trade_wallet_percentage from the whale transaction to determine swap amount
+- Use the trade_wallet_percentage from the whale transaction to determine swap amount (or use available amount you see on the trading wallet)
 - Ensure proper token addresses and decimals are used
 - Execute the swap with the built-in 0.5% slippage tolerance
 
