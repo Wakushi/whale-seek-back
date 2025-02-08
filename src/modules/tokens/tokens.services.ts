@@ -113,7 +113,6 @@ export class TokensService {
       const response = await fetch(url);
 
       if (!response.ok) {
-        console.error(`HTTP error! Status: ${response.status}`);
         return null;
       }
 
