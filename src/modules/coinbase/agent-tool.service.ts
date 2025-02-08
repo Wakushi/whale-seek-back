@@ -158,23 +158,22 @@ export class AgentToolService {
       const getQuote = async () => {
         try {
           const params = {
-            exactCurrency: formattedTokenIn,
-            path: [
-              {
-                intermediateCurrency: formattedTokenOut,
-                fee: 3000,
-                tickSpacing: 60,
-                hooks: '0x0000000000000000000000000000000000000000',
-                hookData: '0x',
-              },
-            ],
+            poolKey: {
+              currency0: formattedTokenIn,
+              currency1: formattedTokenOut,
+              fee: 3000,
+              tickSpacing: 60,
+              hooks: '0x0000000000000000000000000000000000000000',
+            },
+            zeroForOne: true,
             exactAmount: amountIn,
+            hookData: '0x',
           };
 
           const result: any = await walletProvider.readContract({
             address: QUOTER_V2_ADDRESS,
             abi: QUOTER_V2_ABI,
-            functionName: 'quoteExactInput',
+            functionName: 'quoteExactInputSingle',
             args: [params],
           });
 
@@ -188,7 +187,6 @@ export class AgentToolService {
           return 0;
         }
       };
-
       const amountOutMin = await getQuote();
 
       const transaction: TransactionRequest = {
