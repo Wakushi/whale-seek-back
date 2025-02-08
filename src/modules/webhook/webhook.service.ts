@@ -118,18 +118,6 @@ export class WebhookService {
           continue;
         }
 
-        console.log('=========================');
-
-        console.log(
-          `Analyzing activity:\n` +
-            `  Asset:    ${activity.asset}\n` +
-            `  Value:    ${activity.value}\n` +
-            `  From:     ${activity.fromAddress}\n` +
-            `  To:       ${activity.toAddress}\n` +
-            `  Contract: ${activity.rawContract.address}\n` +
-            `  Hash:     ${activity.hash}`,
-        );
-
         this.logger.log(
           `Processing ${webhookData.id} for hash ${activity.hash}...`,
         );

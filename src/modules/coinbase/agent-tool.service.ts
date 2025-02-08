@@ -209,10 +209,11 @@ export class AgentToolService {
       'Retrieves the ERC-20 token balances for a given wallet address.',
     schema: z.object({
       walletAddress: z.string(),
-      chain: z.enum([Network.BASE_MAINNET, Network.BASE_SEPOLIA]),
     }),
     invoke: async (walletProvider, args: any) => {
-      const { walletAddress, chain } = args;
+      const { walletAddress } = args;
+
+      const chain = Network.BASE_MAINNET;
 
       this.logger.log(
         `Fetching token balances for ${walletAddress} wallet on ${chain}...`,
@@ -234,10 +235,11 @@ export class AgentToolService {
         'Retrieves the market data of a token based on its address and the desired chain.',
       schema: z.object({
         contractAddress: z.string(),
-        chain: z.enum([Network.BASE_MAINNET, Network.BASE_SEPOLIA]),
       }),
       invoke: async (walletProvider, args: any) => {
-        const { contractAddress, chain } = args;
+        const { contractAddress } = args;
+
+        const chain = Network.BASE_MAINNET;
 
         this.logger.log(
           `Fetching metadata for ${contractAddress} on ${chain}...`,
