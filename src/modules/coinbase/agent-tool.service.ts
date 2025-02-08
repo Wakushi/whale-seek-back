@@ -205,6 +205,7 @@ export class AgentToolService {
         return `Swap executed ! Transaction hash: ${hash}`;
       } catch (error) {
         this.logger.error('Swap failed !');
+        return 'Swap failed !'
       }
     },
   });
