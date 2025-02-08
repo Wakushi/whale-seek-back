@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { WhalesService } from './whales.service';
-import { Whale } from './entities/whale.entity';
+import { Whale } from '../discovery/entities/discovery.type';
 
 @Controller('whales')
 export class WhalesController {

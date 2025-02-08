@@ -70,7 +70,7 @@ export class DiscoveryService {
     const filteredWhales = sortedWhales.filter((whale) => whale.score > 70);
 
     if (filteredWhales.length) {
-      await this.saveWhales(filteredWhales.map((w) => w.whaleDetection));
+      await this.saveWhales(filteredWhales);
     }
 
     this.logger.log(
@@ -96,14 +96,20 @@ export class DiscoveryService {
     return whales;
   }
 
-  private async saveWhales(detectedWhales: WhaleDetection[]): Promise<void> {
+  private async saveWhales(
+    detectedWhales: {
+      whaleDetection: WhaleDetection;
+      score: number;
+    }[],
+  ): Promise<void> {
     const now = new Date();
 
-    const whalesInfo = detectedWhales.map(({ address, transactionHash }) => ({
-      whale_address: address,
-      detected_transaction_id: transactionHash,
+    const whalesInfo = detectedWhales.map(({ whaleDetection, score }) => ({
+      whale_address: whaleDetection.address,
+      detected_transaction_id: whaleDetection.transactionHash,
       first_seen: now,
       last_seen: now,
+      score,
     }));
 
     this.supabaseService.batchInsert({
@@ -113,10 +119,14 @@ export class DiscoveryService {
     });
 
     try {
-      const addresses = detectedWhales.map((whale) => whale.address);
+      const addresses = detectedWhales.map(
+        (whale) => whale.whaleDetection.address,
+      );
+
       await this.webhookService.addAddresses({
         addresses_to_add: addresses,
       });
+
       this.logger.log(
         `Successfully added ${addresses.length} whale addresses to webhook tracking`,
       );
