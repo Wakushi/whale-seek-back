@@ -3,14 +3,17 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   app.enableCors({
-    origin: ['http://localhost:3000', 'https://dashboard.alchemy.com'], 
+    origin: [
+      'http://localhost:3000',
+      'https://dashboard.alchemy.com',
+      'https://whal-e-eight.vercel.app',
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Accept', 'X-Alchemy-Token'],
   });
-  
 
   await app.listen(process.env.PORT ?? 3001);
 }
