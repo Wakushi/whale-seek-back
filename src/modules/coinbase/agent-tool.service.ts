@@ -226,6 +226,10 @@ export class AgentToolService {
         chain,
       );
 
+      wallet.tokens.forEach((t, i) => {
+        console.log(`${i + 1}. ${t.name} (${t.symbol}) - ${t.balance}`);
+      });
+
       return wallet;
     },
   });
