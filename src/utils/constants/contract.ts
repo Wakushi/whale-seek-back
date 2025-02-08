@@ -2,9 +2,40 @@ export const BASE_SEPOLIA_FACTORY_ADDRESS =
   '0xE89F35FEb880165D4aBD77094673d28333c6F91a';
 
 export const BASE_MAINNET_FACTORY_ADDRESS =
-  '0xE9E6331b0554018395336489De752C3822028B3A';
+  '0xD528EdB32F8C0c092119630B27e7D939d3759953';
 
 export const FACTORY_ABI = [
+  {
+    inputs: [],
+    name: 'deleteWallet',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'owner',
+        type: 'address',
+      },
+      {
+        internalType: 'address',
+        name: 'agent',
+        type: 'address',
+      },
+    ],
+    name: 'deployWallet',
+    outputs: [
+      {
+        internalType: 'address',
+        name: 'wallet',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
   {
     inputs: [
       {
@@ -73,6 +104,26 @@ export const FACTORY_ABI = [
     type: 'event',
   },
   {
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'newOwner',
+        type: 'address',
+      },
+    ],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
     anonymous: false,
     inputs: [
       {
@@ -102,30 +153,6 @@ export const FACTORY_ABI = [
     ],
     name: 'WalletDeployed',
     type: 'event',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'owner',
-        type: 'address',
-      },
-      {
-        internalType: 'address',
-        name: 'agent',
-        type: 'address',
-      },
-    ],
-    name: 'deployWallet',
-    outputs: [
-      {
-        internalType: 'address',
-        name: 'wallet',
-        type: 'address',
-      },
-    ],
-    stateMutability: 'nonpayable',
-    type: 'function',
   },
   {
     inputs: [],
@@ -243,26 +270,6 @@ export const FACTORY_ABI = [
       },
     ],
     stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'renounceOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'newOwner',
-        type: 'address',
-      },
-    ],
-    name: 'transferOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
     type: 'function',
   },
 ];
