@@ -178,30 +178,34 @@ export class AgentToolService {
         }
       };
 
-      const amountOutMin = await getQuote();
+      try {
+        const amountOutMin = await getQuote();
 
-      this.logger.log(
-        `Preparing swap tokens for wallet ${wallet}:
+        this.logger.log(
+          `Preparing swap tokens for wallet ${wallet}:
         Token In: ${tokenIn} 
         Token Out: ${tokenOut} 
         Amount In: ${amountIn}
         Min Amount Out: ${amountOutMin}`,
-      );
+        );
 
-      const transaction: TransactionRequest = {
-        to: wallet,
-        data: encodeFunctionData({
-          abi: WALLET_ABI,
-          functionName: 'swapExactInputSingleHop',
-          args: [formattedTokenIn, formattedTokenOut, amountIn, amountOutMin],
-        }),
-      };
+        const transaction: TransactionRequest = {
+          to: wallet,
+          data: encodeFunctionData({
+            abi: WALLET_ABI,
+            functionName: 'swapExactInputSingleHop',
+            args: [formattedTokenIn, formattedTokenOut, amountIn, amountOutMin],
+          }),
+        };
 
-      const hash = await walletProvider.sendTransaction(transaction);
+        const hash = await walletProvider.sendTransaction(transaction);
 
-      this.logger.log(`Swap executed -> ${hash}`);
+        this.logger.log(`Swap executed -> ${hash}`);
 
-      return `Swap executed ! Transaction hash: ${hash}`;
+        return `Swap executed ! Transaction hash: ${hash}`;
+      } catch (error) {
+        this.logger.error('Swap failed !');
+      }
     },
   });
 
