@@ -11,7 +11,6 @@ import {
 } from '@coinbase/agentkit';
 import { getLangChainTools } from '@coinbase/agentkit-langchain';
 import { HumanMessage } from '@langchain/core/messages';
-import { MemorySaver } from '@langchain/langgraph';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { ChatOpenAI } from '@langchain/openai';
 import { Address, createWalletClient, http } from 'viem';
@@ -217,7 +216,6 @@ export class CoinbaseService {
 
       const tools = await getLangChainTools(agentkit);
 
-      const memory = new MemorySaver();
       const agentConfig = {
         configurable: { thread_id: agentType },
       };
@@ -225,7 +223,6 @@ export class CoinbaseService {
       const agent = createReactAgent({
         llm: model,
         tools,
-        checkpointSaver: memory,
         messageModifier: this.getPrompt(agentType),
         responseFormat: this.agentToolService.getAgentFormatting(agentType),
       });
