@@ -18,9 +18,17 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { CoinGeckoTokenMetadata } from './entities/coin-gecko.type';
 import { Collection } from '../supabase/entities/collections';
 
+interface CacheEntry {
+  data: TokenData;
+  timestamp: number;
+}
+
 @Injectable()
 export class TokensService {
   private readonly COINGECKO_API = 'https://api.coingecko.com/api/v3';
+
+  private cache: Map<string, CacheEntry> = new Map();
+  private readonly CACHE_TTL = 10 * 60 * 1000;
 
   constructor(
     private readonly csvService: CsvService,
@@ -83,6 +91,16 @@ export class TokensService {
   }
 
   async getTokenMarketDataById(tokenName: string): Promise<TokenData | null> {
+    const normalizedTokenName = tokenName.trim().toLowerCase();
+    const now = Date.now();
+
+    const cachedEntry = this.cache.get(normalizedTokenName);
+
+    if (cachedEntry && now - cachedEntry.timestamp < this.CACHE_TTL) {
+      console.log('Returning cached data at ' + cachedEntry.timestamp);
+      return cachedEntry.data;
+    }
+
     try {
       let tokenId = await this.getCoinGeckoTokenIdByName(tokenName);
 
@@ -102,7 +120,7 @@ export class TokensService {
       const data = await response.json();
       const marketData = data.market_data;
 
-      return {
+      const tokenData: TokenData = {
         name: data.name,
         symbol: data.symbol,
         description: data.description.en,
@@ -188,6 +206,13 @@ export class TokensService {
           public_interest_score: data.public_interest_score,
         },
       };
+
+      this.cache.set(normalizedTokenName, {
+        data: tokenData,
+        timestamp: now,
+      });
+
+      return tokenData;
     } catch (error) {
       console.error('Error fetching token market data:', error);
       return null;

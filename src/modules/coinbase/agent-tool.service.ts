@@ -179,11 +179,8 @@ export class AgentToolService {
 
           const [amountOut] = result;
 
-          console.log('amountOut: ', amountOut);
-
           return (BigInt(amountOut) * 995n) / 1000n;
         } catch (error) {
-          console.error('Error fetching quote:', error);
           return 0;
         }
       };
