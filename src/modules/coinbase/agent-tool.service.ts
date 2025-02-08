@@ -13,7 +13,7 @@ import {
 import {
   FACTORY_ABI,
   BASE_MAINNET_FACTORY_ADDRESS,
-  BASE_SEPOLIA_WALLET_ABI,
+  WALLET_ABI,
 } from 'src/utils/constants/contract';
 import { z } from 'zod';
 import { TokensService } from '../tokens/tokens.services';
@@ -145,13 +145,6 @@ export class AgentToolService {
     invoke: async (walletProvider, args: any) => {
       const { wallet, tokenIn, tokenOut, amountIn } = args;
 
-      this.logger.log(
-        `Preparing swap tokens for wallet ${wallet}:
-        Token In: ${tokenIn} 
-        Token Out: ${tokenOut} 
-        Amount In: ${amountIn}`,
-      );
-
       const formattedTokenIn = getAddress(tokenIn);
       const formattedTokenOut = getAddress(tokenOut);
 
@@ -184,13 +177,22 @@ export class AgentToolService {
           return 0;
         }
       };
+
       const amountOutMin = await getQuote();
+
+      this.logger.log(
+        `Preparing swap tokens for wallet ${wallet}:
+        Token In: ${tokenIn} 
+        Token Out: ${tokenOut} 
+        Amount In: ${amountIn}
+        Min Amount Out: ${amountOutMin}`,
+      );
 
       const transaction: TransactionRequest = {
         to: wallet,
         data: encodeFunctionData({
-          abi: BASE_SEPOLIA_WALLET_ABI,
-          functionName: 'mockSwap',
+          abi: WALLET_ABI,
+          functionName: 'swapExactInputSingleHop',
           args: [formattedTokenIn, formattedTokenOut, amountIn, amountOutMin],
         }),
       };

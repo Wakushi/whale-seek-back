@@ -267,7 +267,7 @@ export const FACTORY_ABI = [
   },
 ];
 
-export const BASE_SEPOLIA_WALLET_ABI = [
+export const WALLET_ABI = [
   {
     inputs: [
       {
